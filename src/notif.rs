@@ -1,5 +1,6 @@
 use crate::gotify;
 
+// Show notification
 pub fn show(msg: gotify::Message) -> anyhow::Result<()> {
     let urgency = match msg.priority {
         1..=3 => notify_rust::Urgency::Low,
@@ -8,11 +9,16 @@ pub fn show(msg: gotify::Message) -> anyhow::Result<()> {
         _ => anyhow::bail!("Unexpected urgency value"),
     };
 
-    notify_rust::Notification::new()
+    let mut notif = notify_rust::Notification::new();
+    notif
         .summary(&msg.title)
         .body(&msg.message)
-        .urgency(urgency)
-        .show()?;
+        .urgency(urgency);
+    if let Some(img_filepath) = msg.app_img_filepath {
+        notif.icon(&img_filepath);
+    }
+
+    notif.show()?;
 
     Ok(())
 }
