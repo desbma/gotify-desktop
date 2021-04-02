@@ -142,7 +142,7 @@ impl Client {
         base_url: &url::Url,
         client: &reqwest::blocking::Client,
         app_id: i64,
-        img_filepath: &std::path::PathBuf,
+        img_filepath: &std::path::Path,
     ) -> anyhow::Result<Option<String>> {
         // Get app info
         let url = base_url.clone().join("/application")?;
