@@ -1,11 +1,17 @@
 mod config;
 mod gotify;
+mod notif;
 
 fn main() {
     simple_logger::SimpleLogger::new().init().unwrap();
 
     let cfg = config::parse_config().expect("Failed to read config");
 
-    let client = gotify::GotifyClient::new(&cfg.gotify).expect("Failed to connect");
+    let mut client = gotify::Client::new(&cfg.gotify).expect("Failed to connect");
     log::info!("Connected to {}", cfg.gotify.url);
+
+    loop {
+        let msg = client.get_message().expect("Failed to get message");
+        notif::show(msg).expect("Failed to show notification");
+    }
 }

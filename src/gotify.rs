@@ -1,5 +1,19 @@
 use crate::config;
 
+pub struct Client {
+    ws: WebSocket,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct Message {
+    pub id: i64,
+    pub appid: u32,
+    pub message: String,
+    pub title: String,
+    pub priority: i64,
+    pub date: String,
+}
+
 type WebSocket = tungstenite::WebSocket<
     tungstenite::stream::Stream<std::net::TcpStream, native_tls::TlsStream<std::net::TcpStream>>,
 >;
@@ -9,12 +23,8 @@ lazy_static::lazy_static! {
         format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 }
 
-pub struct GotifyClient {
-    ws: WebSocket,
-}
-
-impl GotifyClient {
-    pub fn new(config: &config::GotifyConfig) -> anyhow::Result<GotifyClient> {
+impl Client {
+    pub fn new(config: &config::GotifyConfig) -> anyhow::Result<Client> {
         let request = tungstenite::handshake::client::Request::builder()
             .uri(&config.url)
             .header("User-Agent", &*USER_AGENT)
@@ -32,7 +42,23 @@ impl GotifyClient {
                 status.canonical_reason().unwrap_or("?")
             ))
         } else {
-            Ok(GotifyClient { ws })
+            Ok(Client { ws })
+        }
+    }
+
+    pub fn get_message(&mut self) -> anyhow::Result<Message> {
+        loop {
+            let ws_msg = self.ws.read_message()?;
+            log::trace!("Got message: {:?}", ws_msg);
+
+            let msg_str = match ws_msg {
+                tungstenite::protocol::Message::Text(msg_str) => msg_str,
+                tungstenite::protocol::Message::Ping(_) => continue,
+                _ => anyhow::bail!("Unexpected message type: {:?}", ws_msg),
+            };
+
+            let msg: Message = serde_json::from_str(&msg_str)?;
+            return Ok(msg);
         }
     }
 }
