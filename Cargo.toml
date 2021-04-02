@@ -4,6 +4,17 @@ version = "0.1.0"
 authors = ["desbma <desbma@users.noreply.github.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
 
 [dependencies]
+anyhow = "1.0"
+log = { version = "0.4", features = ["max_level_trace", "release_max_level_warn"] }
+notify-rust = "4"
+serde = "1.0"
+simple_logger = { version = "1.3", default-features = false }
+toml = "0.5"
+tungstenite = "0.13"
+xdg = "2.1"
