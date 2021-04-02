@@ -14,7 +14,7 @@ pub fn parse_config() -> anyhow::Result<Config> {
     let xdg_dirs = xdg::BaseDirectories::with_prefix(binary_name)?;
     let config_filepath = xdg_dirs
         .find_config_file("config.toml")
-        .ok_or(anyhow::anyhow!("Unable to find config file"))?;
+        .ok_or_else(|| anyhow::anyhow!("Unable to find config file"))?;
     log::debug!("Config filepath: {:?}", config_filepath);
 
     let toml_data = std::fs::read_to_string(config_filepath)?;

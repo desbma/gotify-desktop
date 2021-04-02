@@ -7,7 +7,7 @@ pub struct Client {
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Message {
     pub id: i64,
-    pub appid: u32,
+    pub appid: i64,
     pub message: String,
     pub title: String,
     pub priority: i64,
