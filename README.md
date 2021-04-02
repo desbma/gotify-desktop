@@ -31,6 +31,10 @@ url = "wss://SERVER_DOMAIN:SERVER_PORT/stream"
 token = "YOUR_SECRET_TOKEN"
 ```
 
+## Usage
+
+Start `gotify-desktop` in the background using your favorite init system, desktop environment or windows manager.
+
 ## License
 
 [GPLv3](https://www.gnu.org/licenses/gpl-3.0-standalone.html)
