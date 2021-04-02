@@ -5,8 +5,8 @@ pub struct Config {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct GotifyConfig {
-    url: String,
-    token: String,
+    pub url: String,
+    pub token: String,
 }
 
 pub fn parse_config() -> anyhow::Result<Config> {

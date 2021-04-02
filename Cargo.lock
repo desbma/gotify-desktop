@@ -432,7 +432,9 @@ name = "gotify-desktop"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "lazy_static",
  "log",
+ "native-tls",
  "notify-rust",
  "serde",
  "simple_logger",

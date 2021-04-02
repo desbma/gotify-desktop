@@ -11,10 +11,12 @@ panic = "abort"
 
 [dependencies]
 anyhow = "1.0"
+lazy_static = "1.4"
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_warn"] }
+native-tls = "0.2"
 notify-rust = "4"
 serde = "1.0"
 simple_logger = { version = "1.3", default-features = false }
 toml = "0.5"
-tungstenite = "0.13"
+tungstenite = { version = "0.13", features = ["native-tls"] }
 xdg = "2.1"
