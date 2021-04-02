@@ -10,12 +10,14 @@ Small [Gotify](https://gotify.net/) daemon to receive messages and forward them 
 - Read Gotify messages, and forward them as [standard desktop notification](https://www.galago-project.org/specs/notification/0.9/index.html) (should work on must Unix variants)
 - Forward message priority
 - Automatically download, cache, and show app icons
-- Small, fast and self contained binary (no dependencies)
+- Fast and self contained binary (no dependencies)
 
 ## Installation
 
+You need a Rust build environment for example from [rustup](https://rustup.rs/).
+
 ```
-cargo build release
+cargo build --release
 install -Dm 755 -t /usr/local/bin target/release/gotify-desktop
 ```
 
