@@ -11,7 +11,7 @@ pub struct Client {
     xdg_dirs: xdg::BaseDirectories,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Message {
     pub id: i64,
     pub appid: i64,
