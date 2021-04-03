@@ -12,7 +12,7 @@ panic = "abort"
 [dependencies]
 anyhow = "1.0"
 lazy_static = "1.4"
-log = { version = "0.4", features = ["max_level_trace", "release_max_level_warn"] }
+log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"] }
 native-tls = "0.2"
 notify-rust = "4"
 reqwest = {version = "0.11", features = ["blocking"]}

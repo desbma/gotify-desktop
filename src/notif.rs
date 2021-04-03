@@ -3,10 +3,10 @@ use crate::gotify;
 // Show notification
 pub fn show(msg: gotify::Message) -> anyhow::Result<()> {
     let urgency = match msg.priority {
-        1..=3 => notify_rust::Urgency::Low,
+        0..=3 => notify_rust::Urgency::Low,
         4..=7 => notify_rust::Urgency::Normal,
         8..=10 => notify_rust::Urgency::Critical,
-        _ => anyhow::bail!("Unexpected urgency value"),
+        _ => anyhow::bail!("Unexpected urgency value {}", msg.priority),
     };
 
     let mut notif = notify_rust::Notification::new();

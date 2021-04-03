@@ -9,6 +9,7 @@ fn main() {
     let cfg = config::parse_config().expect("Failed to read config");
 
     // Connect
+    // TODO retry connection with increasing delay
     let mut client = gotify::Client::new(&cfg.gotify).expect("Failed to connect");
     log::info!("Connected to {}", cfg.gotify.url);
 
