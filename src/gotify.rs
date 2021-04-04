@@ -83,7 +83,7 @@ impl Client {
 
     pub fn connect(&mut self) -> anyhow::Result<()> {
         let log_failed_attempt = |err, duration| {
-            log::warn!("Connected failed: {}, retrying in {:?}", err, duration);
+            log::warn!("Connection failed: {}, retrying in {:?}", err, duration);
         };
         let retrier = backoff::ExponentialBackoff {
             current_interval: std::time::Duration::from_millis(250),
