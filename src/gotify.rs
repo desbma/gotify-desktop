@@ -4,9 +4,13 @@ use std::collections::HashMap;
 use crate::config;
 
 pub struct Client {
-    base_url: url::Url,
-    ws: WebSocket,
-    http: reqwest::blocking::Client,
+    config: config::GotifyConfig,
+
+    ws: Option<WebSocket>,
+
+    http_client: reqwest::blocking::Client,
+    base_http_url: url::Url,
+
     app_imgs: HashMap<i64, Option<String>>,
     xdg_dirs: xdg::BaseDirectories,
 }
@@ -55,16 +59,34 @@ impl Client {
         gotify_header.set_sensitive(true);
         let mut http_headers = reqwest::header::HeaderMap::new();
         http_headers.insert("X-Gotify-Key", gotify_header);
-        let http = reqwest::blocking::Client::builder()
+        let http_client = reqwest::blocking::Client::builder()
             .user_agent(&*USER_AGENT)
             .default_headers(http_headers)
             .build()?;
+        let mut base_url = url::Url::parse(&config.url)?;
+        let scheme = match base_url.scheme() {
+            "wss" => "https",
+            "ws" => "http",
+            s => anyhow::bail!("Unexpected scheme {:?}", s),
+        };
+        base_url.set_scheme(scheme).unwrap();
 
+        Ok(Client {
+            config: config.to_owned(),
+            ws: None,
+            http_client,
+            base_http_url: base_url,
+            app_imgs,
+            xdg_dirs,
+        })
+    }
+
+    pub fn connect(&mut self) -> anyhow::Result<()> {
         // WS connect & handshake
         let request = tungstenite::handshake::client::Request::builder()
-            .uri(&config.url)
+            .uri(&self.config.url)
             .header("User-Agent", &*USER_AGENT)
-            .header("X-Gotify-Key", &config.token)
+            .header("X-Gotify-Key", &self.config.token)
             .body(())?;
         let (mut ws, response) = tungstenite::connect(request)?;
 
@@ -78,27 +100,15 @@ impl Client {
                 status.canonical_reason().unwrap_or("?")
             ))
         } else {
-            let mut base_url = url::Url::parse(&config.url)?;
-            let scheme = match base_url.scheme() {
-                "wss" => "https",
-                "ws" => "http",
-                _ => anyhow::bail!("Unexpected scheme {:?}", base_url.scheme()),
-            };
-            base_url.set_scheme(scheme).unwrap();
-            Ok(Client {
-                base_url,
-                ws,
-                http,
-                app_imgs,
-                xdg_dirs,
-            })
+            self.ws = Some(ws);
+            Ok(())
         }
     }
 
     pub fn get_message(&mut self) -> anyhow::Result<Message> {
         loop {
             // Read message
-            let ws_msg = self.ws.read_message()?;
+            let ws_msg = self.ws.as_mut().unwrap().read_message()?;
             log::trace!("Got message: {:?}", ws_msg);
 
             // Check message type
@@ -113,7 +123,7 @@ impl Client {
 
             // Download image if needed
             msg.app_img_filepath = match self.app_imgs.entry(msg.appid) {
-                Entry::Occupied(e) => e.get().clone(),
+                Entry::Occupied(e) => e.get().to_owned(),
                 Entry::Vacant(e) => {
                     let img_filepath = self
                         .xdg_dirs
@@ -123,13 +133,13 @@ impl Client {
                         Some(img_filepath.into_os_string().into_string().unwrap())
                     } else {
                         Client::download_app_img(
-                            &self.base_url,
-                            &self.http,
+                            &self.base_http_url,
+                            &self.http_client,
                             msg.appid,
                             &img_filepath,
                         )?
                     };
-                    e.insert(new_entry.clone());
+                    e.insert(new_entry.to_owned());
                     new_entry
                 }
             };
@@ -145,7 +155,7 @@ impl Client {
         img_filepath: &std::path::Path,
     ) -> anyhow::Result<Option<String>> {
         // Get app info
-        let url = base_url.clone().join("/application")?;
+        let url = base_url.to_owned().join("/application")?;
         log::debug!("{}", url);
         let response = client.get(url).send()?.error_for_status()?;
         let json_data = response.text()?;
@@ -156,7 +166,7 @@ impl Client {
 
         // Download if we can
         if !matching_app.image.is_empty() {
-            let img_url = base_url.clone().join(&matching_app.image)?;
+            let img_url = base_url.to_owned().join(&matching_app.image)?;
             log::debug!("{}", img_url);
             let mut img_response = client.get(img_url).send()?.error_for_status()?;
             let mut img_file = std::fs::File::create(&img_filepath)?;

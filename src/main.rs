@@ -10,7 +10,8 @@ fn main() {
 
     // Connect
     // TODO retry connection with increasing delay
-    let mut client = gotify::Client::new(&cfg.gotify).expect("Failed to connect");
+    let mut client = gotify::Client::new(&cfg.gotify).expect("Failed to setup client");
+    client.connect().expect("Failed to connect");
     log::info!("Connected to {}", cfg.gotify.url);
 
     // Main loop

@@ -3,7 +3,7 @@ pub struct Config {
     pub gotify: GotifyConfig,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Deserialize)]
 pub struct GotifyConfig {
     pub url: String,
     pub token: String,
