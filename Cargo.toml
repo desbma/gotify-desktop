@@ -11,6 +11,7 @@ panic = "abort"
 
 [dependencies]
 anyhow = "1.0"
+backoff = { version = "0.3", default-features = false }
 lazy_static = "1.4"
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"] }
 native-tls = "0.2"

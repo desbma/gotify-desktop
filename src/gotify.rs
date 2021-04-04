@@ -82,6 +82,30 @@ impl Client {
     }
 
     pub fn connect(&mut self) -> anyhow::Result<()> {
+        let log_failed_attempt = |err, duration| {
+            log::warn!("Connected failed: {}, retrying in {:?}", err, duration);
+        };
+        let retrier = backoff::ExponentialBackoff {
+            current_interval: std::time::Duration::from_millis(250),
+            initial_interval: std::time::Duration::from_millis(250),
+            randomization_factor: 0.0,
+            multiplier: 1.5,
+            max_interval: std::time::Duration::from_secs(60),
+            max_elapsed_time: None,
+            ..backoff::ExponentialBackoff::default()
+        };
+        backoff::retry_notify(
+            retrier,
+            || self.try_connect().map_err(backoff::Error::Transient),
+            log_failed_attempt,
+        )
+        .map_err(|e| match e {
+            backoff::Error::Permanent(e) => e,
+            backoff::Error::Transient(e) => e,
+        })
+    }
+
+    fn try_connect(&mut self) -> anyhow::Result<()> {
         // WS connect & handshake
         let request = tungstenite::handshake::client::Request::builder()
             .uri(&self.config.url)

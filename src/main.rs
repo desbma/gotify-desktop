@@ -3,14 +3,16 @@ mod gotify;
 mod notif;
 
 fn main() {
+    // Init logger
     simple_logger::SimpleLogger::new().init().unwrap();
 
     // Parse config
     let cfg = config::parse_config().expect("Failed to read config");
 
-    // Connect
-    // TODO retry connection with increasing delay
+    // Init client
     let mut client = gotify::Client::new(&cfg.gotify).expect("Failed to setup client");
+
+    // Connect
     client.connect().expect("Failed to connect");
     log::info!("Connected to {}", cfg.gotify.url);
 
