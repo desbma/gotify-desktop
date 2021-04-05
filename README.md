@@ -24,12 +24,15 @@ install -Dm 755 -t /usr/local/bin target/release/gotify-desktop
 
 ## Configuration
 
-Edit `~/.config/gotify-desktop/config.toml` with your server URL and client token:
+Edit `~/.config/gotify-desktop/config.toml` with your server URL and client token, and other settings:
 
 ```
 [gotify]
 url = "wss://SERVER_DOMAIN:SERVER_PORT/stream"
 token = "YOUR_SECRET_TOKEN"
+
+[notification]
+min_priority = 1  # ignores messages with priority 0
 ```
 
 ## Usage

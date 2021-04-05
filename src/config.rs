@@ -1,12 +1,20 @@
 #[derive(Debug, serde::Deserialize)]
 pub struct Config {
     pub gotify: GotifyConfig,
+
+    #[serde(default)]
+    pub notification: NotificationConfig,
 }
 
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct GotifyConfig {
     pub url: String,
     pub token: String,
+}
+
+#[derive(Debug, Default, serde::Deserialize)]
+pub struct NotificationConfig {
+    pub min_priority: i64,
 }
 
 pub fn parse_config() -> anyhow::Result<Config> {
