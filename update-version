@@ -1,0 +1,18 @@
+#!/bin/bash -eu
+
+set -o pipefail
+
+readonly VERSION=${1:?}
+
+
+cd "$(git rev-parse --show-toplevel)"
+
+sed -i "s/^\(version = \"\).*\(\"\)/\1$VERSION\2/w /dev/stdout" Cargo.toml
+
+cargo update
+
+git add Cargo.{toml,lock}
+
+git commit -m "Version ${VERSION}"
+
+git tag -m "Version ${VERSION}" "${VERSION}"
