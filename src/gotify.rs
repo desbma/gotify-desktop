@@ -149,17 +149,49 @@ impl Client {
             // Parse
             let mut msg: Message = serde_json::from_str(&msg_str)?;
 
-            // Download image if needed
+            // Get app image
             msg.app_img_filepath = match self.app_imgs.entry(msg.appid) {
-                Entry::Occupied(e) => e.get().to_owned(),
+                // Cache hit
+                Entry::Occupied(e) => match e.get() {
+                    None => None,
+                    Some(img_filepath) => {
+                        if let Ok(_metadata) = std::fs::metadata(&img_filepath) {
+                            // Image file already exists
+                            Some(img_filepath.to_owned())
+                        } else {
+                            log::warn!(
+                                "File {:?} has been removed, will try to download it again",
+                                img_filepath
+                            );
+
+                            // Create cache path
+                            let img_filepath = self
+                                .xdg_dirs
+                                .place_cache_file(format!("app-{}.png", msg.appid))?;
+
+                            // Download image file if app has one
+                            Self::download_app_img(
+                                &self.http_url,
+                                &self.http_client,
+                                msg.appid,
+                                &img_filepath,
+                            )?
+                        }
+                    }
+                },
+                // Cache miss
                 Entry::Vacant(e) => {
+                    // Create cache path
                     let img_filepath = self
                         .xdg_dirs
                         .place_cache_file(format!("app-{}.png", msg.appid))?;
+
                     let new_entry = if let Ok(_metadata) = std::fs::metadata(&img_filepath) {
                         // && metadata.is_file()
+                        // Image file already exists
                         Some(img_filepath.into_os_string().into_string().unwrap())
                     } else {
+                        // Download image file if app has one
                         Self::download_app_img(
                             &self.http_url,
                             &self.http_client,
