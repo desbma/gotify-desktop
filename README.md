@@ -28,7 +28,7 @@ Edit `~/.config/gotify-desktop/config.toml` with your server URL and client toke
 
 ```
 [gotify]
-url = "wss://SERVER_DOMAIN:SERVER_PORT/"
+url = "wss://SERVER_DOMAIN:SERVER_PORT"
 token = "YOUR_SECRET_TOKEN"
 
 [notification]

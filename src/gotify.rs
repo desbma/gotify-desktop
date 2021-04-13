@@ -107,7 +107,10 @@ impl Client {
 
     fn try_connect(&mut self) -> anyhow::Result<()> {
         // WS connect & handshake
-        let url = self.config.url.to_owned().join("/stream")?;
+        let mut url = self.config.url.to_owned();
+        url.path_segments_mut()
+            .map_err(|_| anyhow::anyhow!("Invalid URL {}", self.config.url))?
+            .push("stream");
         let request = tungstenite::handshake::client::Request::builder()
             .uri(url.to_string())
             .header("User-Agent", &*USER_AGENT)
@@ -180,7 +183,10 @@ impl Client {
         img_filepath: &std::path::Path,
     ) -> anyhow::Result<Option<String>> {
         // Get app info
-        let url = http_url.to_owned().join("/application")?;
+        let mut url = http_url.to_owned();
+        url.path_segments_mut()
+            .map_err(|_| anyhow::anyhow!("Invalid URL {}", http_url))?
+            .push("application");
         log::debug!("{}", url);
         let response = client.get(url).send()?.error_for_status()?;
         let json_data = response.text()?;
