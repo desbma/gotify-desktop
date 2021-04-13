@@ -9,7 +9,7 @@ pub struct Client {
     ws: Option<WebSocket>,
 
     http_client: reqwest::blocking::Client,
-    base_http_url: url::Url,
+    http_url: url::Url,
 
     app_imgs: HashMap<i64, Option<String>>,
     xdg_dirs: xdg::BaseDirectories,
@@ -63,19 +63,19 @@ impl Client {
             .user_agent(&*USER_AGENT)
             .default_headers(http_headers)
             .build()?;
-        let mut base_url = url::Url::parse(&config.url)?;
-        let scheme = match base_url.scheme() {
+        let mut url = config.url.to_owned();
+        let scheme = match url.scheme() {
             "wss" => "https",
             "ws" => "http",
             s => anyhow::bail!("Unexpected scheme {:?}", s),
         };
-        base_url.set_scheme(scheme).unwrap();
+        url.set_scheme(scheme).unwrap();
 
         Ok(Client {
             config: config.to_owned(),
             ws: None,
             http_client,
-            base_http_url: base_url,
+            http_url: url,
             app_imgs,
             xdg_dirs,
         })
@@ -107,8 +107,9 @@ impl Client {
 
     fn try_connect(&mut self) -> anyhow::Result<()> {
         // WS connect & handshake
+        let url = self.config.url.to_owned().join("/stream")?;
         let request = tungstenite::handshake::client::Request::builder()
-            .uri(&self.config.url)
+            .uri(url.to_string())
             .header("User-Agent", &*USER_AGENT)
             .header("X-Gotify-Key", &self.config.token)
             .body(())?;
@@ -156,8 +157,8 @@ impl Client {
                         // && metadata.is_file()
                         Some(img_filepath.into_os_string().into_string().unwrap())
                     } else {
-                        Client::download_app_img(
-                            &self.base_http_url,
+                        Self::download_app_img(
+                            &self.http_url,
                             &self.http_client,
                             msg.appid,
                             &img_filepath,
@@ -173,13 +174,13 @@ impl Client {
     }
 
     fn download_app_img(
-        base_url: &url::Url,
+        http_url: &url::Url,
         client: &reqwest::blocking::Client,
         app_id: i64,
         img_filepath: &std::path::Path,
     ) -> anyhow::Result<Option<String>> {
         // Get app info
-        let url = base_url.to_owned().join("/application")?;
+        let url = http_url.to_owned().join("/application")?;
         log::debug!("{}", url);
         let response = client.get(url).send()?.error_for_status()?;
         let json_data = response.text()?;
@@ -190,7 +191,7 @@ impl Client {
 
         // Download if we can
         if !matching_app.image.is_empty() {
-            let img_url = base_url.to_owned().join(&matching_app.image)?;
+            let img_url = http_url.to_owned().join(&matching_app.image)?;
             log::debug!("{}", img_url);
             let mut img_response = client.get(img_url).send()?.error_for_status()?;
             let mut img_file = std::fs::File::create(&img_filepath)?;

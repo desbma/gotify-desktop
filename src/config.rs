@@ -8,7 +8,7 @@ pub struct Config {
 
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct GotifyConfig {
-    pub url: String,
+    pub url: url::Url,
     pub token: String,
 }
 
