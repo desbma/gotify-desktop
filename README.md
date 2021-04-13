@@ -10,7 +10,7 @@ Small [Gotify](https://gotify.net/) daemon to receive messages and forward them 
 - Read Gotify messages, and forward them as [standard desktop notification](https://www.galago-project.org/specs/notification/0.9/index.html) (should work on must Unix variants)
 - Forward message priority
 - Automatically download, cache, and show app icons
-- Fast and self contained binary (no dependencies)
+- Fast and self contained binary (no runtime dependencies)
 
 ## Installation
 
@@ -32,7 +32,7 @@ url = "wss://SERVER_DOMAIN:SERVER_PORT/stream"
 token = "YOUR_SECRET_TOKEN"
 
 [notification]
-min_priority = 1  # ignores messages with priority 0
+min_priority = 1  # optional, ignores messages with priority lower than given value
 ```
 
 ## Usage
