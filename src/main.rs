@@ -19,7 +19,7 @@ fn main() {
     // Main loop
     loop {
         let msg = client.get_message().expect("Failed to get message");
-        log::info!("Parsed messaged {:?}", msg);
+        log::info!("Parsed {:?}", msg);
 
         if msg.priority >= cfg.notification.min_priority {
             notif::show(msg).expect("Failed to show notification");
