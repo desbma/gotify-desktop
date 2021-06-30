@@ -1,7 +1,17 @@
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::io::ErrorKind;
+use std::os::unix::io::AsRawFd;
+use std::time::Duration;
 
 use crate::config;
+
+#[derive(thiserror::Error, Debug)]
+#[error(transparent)]
+pub struct NeedsReconnect {
+    #[from]
+    inner: std::io::Error,
+}
 
 pub struct Client {
     config: config::GotifyConfig,
@@ -10,6 +20,8 @@ pub struct Client {
 
     http_client: reqwest::blocking::Client,
     http_url: url::Url,
+
+    poller: mio::Poll,
 
     app_imgs: HashMap<i64, Option<String>>,
     xdg_dirs: xdg::BaseDirectories,
@@ -71,11 +83,14 @@ impl Client {
         };
         url.set_scheme(scheme).unwrap();
 
+        let poller = mio::Poll::new()?;
+
         Ok(Client {
             config: config.to_owned(),
             ws: None,
             http_client,
             http_url: url,
+            poller,
             app_imgs,
             xdg_dirs,
         })
@@ -122,27 +137,57 @@ impl Client {
         let status = response.status();
         if !status.is_informational() && !status.is_success() {
             ws.close(None)?;
-            Err(anyhow::anyhow!(
+            anyhow::bail!(
                 "Server returned response code {} {}",
                 status.as_str(),
                 status.canonical_reason().unwrap_or("?")
-            ))
-        } else {
-            self.ws = Some(ws);
-            Ok(())
+            );
         }
+
+        // Setup poller
+        let poller_registry = self.poller.registry();
+        let fd = match &ws.get_ref() {
+            tungstenite::stream::Stream::Plain(s) => s.as_raw_fd(),
+            tungstenite::stream::Stream::Tls(t) => t.get_ref().as_raw_fd(),
+        };
+        poller_registry.register(
+            &mut mio::unix::SourceFd(&fd),
+            mio::Token(0),
+            mio::Interest::READABLE,
+        )?;
+
+        self.ws = Some(ws);
+        Ok(())
     }
 
     pub fn get_message(&mut self) -> anyhow::Result<Message> {
+        let ws = self.ws.as_mut().unwrap();
+
         loop {
+            // Poll to detect stale socket, so we can trigger reconnect,
+            // this can occur when returning from sleep/hibernation
+            // Without this, read_message blocks forever even if server already closed its end
+            let mut _poller_events = mio::Events::with_capacity(1);
+            let poll_res = self
+                .poller
+                .poll(&mut _poller_events, Some(Duration::from_secs(30)));
+            if let Err(e) = poll_res {
+                if e.kind() == ErrorKind::Interrupted {
+                    return Err(NeedsReconnect { inner: e }.into());
+                }
+            }
+
             // Read message
-            let ws_msg = self.ws.as_mut().unwrap().read_message()?;
+            let ws_msg = ws.read_message()?;
             log::trace!("Got message: {:?}", ws_msg);
 
             // Check message type
             let msg_str = match ws_msg {
                 tungstenite::protocol::Message::Text(msg_str) => msg_str,
-                tungstenite::protocol::Message::Ping(_) => continue,
+                tungstenite::protocol::Message::Ping(_) => {
+                    ws.write_pending()?;
+                    continue;
+                }
                 _ => anyhow::bail!("Unexpected message type: {:?}", ws_msg),
             };
 
