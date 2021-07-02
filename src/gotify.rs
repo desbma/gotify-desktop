@@ -101,11 +101,11 @@ impl Client {
             log::warn!("Connection failed: {}, retrying in {:?}", err, duration);
         };
         let retrier = backoff::ExponentialBackoff {
-            current_interval: std::time::Duration::from_millis(250),
-            initial_interval: std::time::Duration::from_millis(250),
+            current_interval: Duration::from_millis(250),
+            initial_interval: Duration::from_millis(250),
             randomization_factor: 0.0,
             multiplier: 1.5,
-            max_interval: std::time::Duration::from_secs(60),
+            max_interval: Duration::from_secs(60),
             max_elapsed_time: None,
             ..backoff::ExponentialBackoff::default()
         };
@@ -167,14 +167,17 @@ impl Client {
             // Poll to detect stale socket, so we can trigger reconnect,
             // this can occur when returning from sleep/hibernation
             // Without this, read_message blocks forever even if server already closed its end
-            let mut _poller_events = mio::Events::with_capacity(1);
-            let poll_res = self
-                .poller
-                .poll(&mut _poller_events, Some(Duration::from_secs(30)));
-            if let Err(e) = poll_res {
-                if e.kind() == ErrorKind::Interrupted {
+            let mut poller_events = mio::Events::with_capacity(1);
+            let poll_res = self.poller.poll(&mut poller_events, None);
+            match poll_res {
+                Err(e) if e.kind() == ErrorKind::Interrupted => {
                     return Err(NeedsReconnect { inner: e }.into());
                 }
+                Err(_) => poll_res.unwrap(),
+                _ => {}
+            }
+            if poller_events.is_empty() {
+                continue;
             }
 
             // Read message
