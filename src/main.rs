@@ -2,6 +2,18 @@ mod config;
 mod gotify;
 mod notif;
 
+fn handle_message(message: gotify::Message, min_priority: i64) -> anyhow::Result<()> {
+    log::info!("Got {:?}", message);
+
+    if message.priority >= min_priority {
+        notif::show(message)?;
+    } else {
+        log::debug!("Ignoring message of priority {}", message.priority);
+    }
+
+    Ok(())
+}
+
 fn main() {
     // Init logger
     simple_logger::SimpleLogger::new().init().unwrap();
@@ -9,16 +21,24 @@ fn main() {
     // Parse config
     let cfg = config::parse_config().expect("Failed to read config");
 
+    // Init client
+    let mut client = gotify::Client::new(&cfg.gotify).expect("Failed to setup client");
+
     // Connect loop
     loop {
-        // Init client
-        let mut client = gotify::Client::new(&cfg.gotify).expect("Failed to setup client");
-
         // Connect
         client.connect().expect("Failed to connect");
         log::info!("Connected to {}", cfg.gotify.url);
 
-        // Message loop
+        // Handle missed messages
+        for msg in client
+            .get_missed_messages()
+            .expect("Failed to get missed messages")
+        {
+            handle_message(msg, cfg.notification.min_priority).expect("Failed to handle message");
+        }
+
+        // Blocking message loop
         loop {
             let res = client.get_message();
             let msg = match res {
@@ -31,13 +51,8 @@ fn main() {
                     unreachable!();
                 }
             };
-            log::info!("Parsed {:?}", msg);
 
-            if msg.priority >= cfg.notification.min_priority {
-                notif::show(msg).expect("Failed to show notification");
-            } else {
-                log::debug!("Ignoring message of priority {}", msg.priority);
-            }
+            handle_message(msg, cfg.notification.min_priority).expect("Failed to handle message");
         }
     }
 }

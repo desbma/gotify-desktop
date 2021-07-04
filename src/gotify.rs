@@ -17,14 +17,15 @@ pub struct Client {
     config: config::GotifyConfig,
 
     ws: Option<WebSocket>,
+    poller: Option<mio::Poll>,
 
     http_client: reqwest::blocking::Client,
     http_url: url::Url,
 
-    poller: mio::Poll,
-
     app_imgs: HashMap<i64, Option<String>>,
     xdg_dirs: xdg::BaseDirectories,
+
+    last_msg_id: Option<i64>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -38,6 +39,11 @@ pub struct Message {
 
     #[serde(skip)]
     pub app_img_filepath: Option<String>,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct AllMessages {
+    messages: Vec<Message>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -66,7 +72,7 @@ impl Client {
         let binary_name = env!("CARGO_PKG_NAME");
         let xdg_dirs = xdg::BaseDirectories::with_prefix(binary_name)?;
 
-        // Http client to get images
+        // Http client (non WS)
         let mut gotify_header = reqwest::header::HeaderValue::from_str(&config.token)?;
         gotify_header.set_sensitive(true);
         let mut http_headers = reqwest::header::HeaderMap::new();
@@ -83,16 +89,15 @@ impl Client {
         };
         url.set_scheme(scheme).unwrap();
 
-        let poller = mio::Poll::new()?;
-
         Ok(Client {
             config: config.to_owned(),
             ws: None,
+            poller: None,
             http_client,
             http_url: url,
-            poller,
             app_imgs,
             xdg_dirs,
+            last_msg_id: None,
         })
     }
 
@@ -145,7 +150,8 @@ impl Client {
         }
 
         // Setup poller
-        let poller_registry = self.poller.registry();
+        let poller = mio::Poll::new()?;
+        let poller_registry = poller.registry();
         let fd = match &ws.get_ref() {
             tungstenite::stream::Stream::Plain(s) => s.as_raw_fd(),
             tungstenite::stream::Stream::Tls(t) => t.get_ref().as_raw_fd(),
@@ -157,18 +163,51 @@ impl Client {
         )?;
 
         self.ws = Some(ws);
+        self.poller = Some(poller);
         Ok(())
+    }
+
+    pub fn get_missed_messages(&mut self) -> anyhow::Result<Vec<Message>> {
+        if let Some(last_msg_id) = self.last_msg_id {
+            // Get all recent messages
+            let mut url = self.http_url.to_owned();
+            url.path_segments_mut()
+                .map_err(|_| anyhow::anyhow!("Invalid URL {}", self.http_url))?
+                .push("message");
+            // url.query_pairs_mut()
+            //    .append_pair("limit", "512");
+            log::debug!("{}", url);
+            let response = self.http_client.get(url).send()?.error_for_status()?;
+            let json_data = response.text()?;
+            log::trace!("{}", json_data);
+
+            // Parse response & keep the ones we have not yet seen
+            let all_messages: AllMessages = serde_json::from_str(&json_data)?;
+            let missed_messages: Vec<Message> = all_messages
+                .messages
+                .into_iter()
+                .filter(|m| m.id > last_msg_id)
+                .rev()
+                .collect();
+            if let Some(last_msg) = missed_messages.iter().last() {
+                self.last_msg_id = Some(last_msg.id);
+            }
+            Ok(missed_messages)
+        } else {
+            Ok(vec![])
+        }
     }
 
     pub fn get_message(&mut self) -> anyhow::Result<Message> {
         let ws = self.ws.as_mut().unwrap();
+        let poller = self.poller.as_mut().unwrap();
 
         loop {
             // Poll to detect stale socket, so we can trigger reconnect,
             // this can occur when returning from sleep/hibernation
             // Without this, read_message blocks forever even if server already closed its end
             let mut poller_events = mio::Events::with_capacity(1);
-            let poll_res = self.poller.poll(&mut poller_events, None);
+            let poll_res = poller.poll(&mut poller_events, None);
             match poll_res {
                 Err(e) if e.kind() == ErrorKind::Interrupted => {
                     return Err(NeedsReconnect { inner: e }.into());
@@ -252,6 +291,7 @@ impl Client {
                 }
             };
 
+            self.last_msg_id = Some(msg.id);
             return Ok(msg);
         }
     }
