@@ -15,6 +15,8 @@ Small [Gotify](https://gotify.net/) daemon to receive messages and forward them 
 
 ## Installation
 
+### From source
+
 You need a Rust build environment for example from [rustup](https://rustup.rs/).
 
 ```
@@ -22,6 +24,10 @@ cargo build --release
 strip --strip-all target/release/gotify-desktop
 install -Dm 755 -t /usr/local/bin target/release/gotify-desktop
 ```
+
+### From AUR
+
+Arch Linux users can install the [gotify-desktop AUR package](https://aur.archlinux.org/packages/gotify-desktop/).
 
 ## Configuration
 
