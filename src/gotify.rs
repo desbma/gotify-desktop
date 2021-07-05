@@ -174,8 +174,7 @@ impl Client {
             url.path_segments_mut()
                 .map_err(|_| anyhow::anyhow!("Invalid URL {}", self.http_url))?
                 .push("message");
-            url.query_pairs_mut()
-                .append_pair("limit", &self.config.max_missed.to_string());
+            url.query_pairs_mut().append_pair("limit", "200");
             log::debug!("{}", url);
             let response = self.http_client.get(url).send()?.error_for_status()?;
             let json_data = response.text()?;
