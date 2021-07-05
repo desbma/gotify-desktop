@@ -234,6 +234,7 @@ impl Client {
             };
 
             // Parse
+            log::trace!("{}", msg_str);
             let mut msg: Message = serde_json::from_str(&msg_str)?;
 
             // Get app image
@@ -310,6 +311,7 @@ impl Client {
         log::debug!("{}", url);
         let response = client.get(url).send()?.error_for_status()?;
         let json_data = response.text()?;
+        log::trace!("{}", json_data);
 
         // Parse it
         let apps: Vec<AppInfo> = serde_json::from_str(&json_data)?;

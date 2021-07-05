@@ -31,11 +31,15 @@ fn main() {
         log::info!("Connected to {}", cfg.gotify.url);
 
         // Handle missed messages
-        for msg in client
+        let missed_messages = client
             .get_missed_messages()
-            .expect("Failed to get missed messages")
-        {
-            handle_message(msg, cfg.notification.min_priority).expect("Failed to handle message");
+            .expect("Failed to get missed messages");
+        if !missed_messages.is_empty() {
+            log::info!("Catching up {} missed message(s)", missed_messages.len());
+            for msg in missed_messages {
+                handle_message(msg, cfg.notification.min_priority)
+                    .expect("Failed to handle message");
+            }
         }
 
         // Blocking message loop
