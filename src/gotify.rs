@@ -168,7 +168,7 @@ impl Client {
     }
 
     pub fn get_missed_messages(&mut self) -> anyhow::Result<Vec<Message>> {
-        if let Some(last_msg_id) = self.last_msg_id {
+        let mut missed_messages: Vec<Message> = if let Some(last_msg_id) = self.last_msg_id {
             // Get all recent messages
             let mut url = self.http_url.to_owned();
             url.path_segments_mut()
@@ -183,19 +183,25 @@ impl Client {
 
             // Parse response & keep the ones we have not yet seen
             let all_messages: AllMessages = serde_json::from_str(&json_data)?;
-            let missed_messages: Vec<Message> = all_messages
+            all_messages
                 .messages
                 .into_iter()
                 .filter(|m| m.id > last_msg_id)
                 .rev()
-                .collect();
-            if let Some(last_msg) = missed_messages.iter().last() {
-                self.last_msg_id = Some(last_msg.id);
-            }
-            Ok(missed_messages)
+                .collect()
         } else {
-            Ok(vec![])
+            vec![]
+        };
+
+        for missed_message in missed_messages.iter_mut() {
+            self.set_app_img(missed_message)?;
         }
+
+        if let Some(last_msg) = missed_messages.iter().last() {
+            self.last_msg_id = Some(last_msg.id);
+        }
+
+        Ok(missed_messages)
     }
 
     pub fn get_message(&mut self) -> anyhow::Result<Message> {
@@ -238,47 +244,33 @@ impl Client {
             let mut msg: Message = serde_json::from_str(&msg_str)?;
 
             // Get app image
-            msg.app_img_filepath = match self.app_imgs.entry(msg.appid) {
-                // Cache hit
-                Entry::Occupied(e) => match e.get() {
-                    None => None,
-                    Some(img_filepath) => {
-                        if let Ok(_metadata) = std::fs::metadata(&img_filepath) {
-                            // Image file already exists
-                            Some(img_filepath.to_owned())
-                        } else {
-                            log::warn!(
-                                "File {:?} has been removed, will try to download it again",
-                                img_filepath
-                            );
+            self.set_app_img(&mut msg)?;
 
-                            // Create cache path
-                            let img_filepath = self
-                                .xdg_dirs
-                                .place_cache_file(format!("app-{}.png", msg.appid))?;
+            self.last_msg_id = Some(msg.id);
+            return Ok(msg);
+        }
+    }
 
-                            // Download image file if app has one
-                            Self::download_app_img(
-                                &self.http_url,
-                                &self.http_client,
-                                msg.appid,
-                                &img_filepath,
-                            )?
-                        }
-                    }
-                },
-                // Cache miss
-                Entry::Vacant(e) => {
-                    // Create cache path
-                    let img_filepath = self
-                        .xdg_dirs
-                        .place_cache_file(format!("app-{}.png", msg.appid))?;
-
-                    let new_entry = if let Ok(_metadata) = std::fs::metadata(&img_filepath) {
-                        // && metadata.is_file()
+    fn set_app_img(&mut self, msg: &mut Message) -> anyhow::Result<()> {
+        msg.app_img_filepath = match self.app_imgs.entry(msg.appid) {
+            // Cache hit
+            Entry::Occupied(e) => match e.get() {
+                None => None,
+                Some(img_filepath) => {
+                    if let Ok(_metadata) = std::fs::metadata(&img_filepath) {
                         // Image file already exists
-                        Some(img_filepath.into_os_string().into_string().unwrap())
+                        Some(img_filepath.to_owned())
                     } else {
+                        log::warn!(
+                            "File {:?} has been removed, will try to download it again",
+                            img_filepath
+                        );
+
+                        // Create cache path
+                        let img_filepath = self
+                            .xdg_dirs
+                            .place_cache_file(format!("app-{}.png", msg.appid))?;
+
                         // Download image file if app has one
                         Self::download_app_img(
                             &self.http_url,
@@ -286,15 +278,35 @@ impl Client {
                             msg.appid,
                             &img_filepath,
                         )?
-                    };
-                    e.insert(new_entry.to_owned());
-                    new_entry
+                    }
                 }
-            };
+            },
+            // Cache miss
+            Entry::Vacant(e) => {
+                // Create cache path
+                let img_filepath = self
+                    .xdg_dirs
+                    .place_cache_file(format!("app-{}.png", msg.appid))?;
 
-            self.last_msg_id = Some(msg.id);
-            return Ok(msg);
-        }
+                let new_entry = if let Ok(_metadata) = std::fs::metadata(&img_filepath) {
+                    // && metadata.is_file()
+                    // Image file already exists
+                    Some(img_filepath.into_os_string().into_string().unwrap())
+                } else {
+                    // Download image file if app has one
+                    Self::download_app_img(
+                        &self.http_url,
+                        &self.http_client,
+                        msg.appid,
+                        &img_filepath,
+                    )?
+                };
+                e.insert(new_entry.to_owned());
+                new_entry
+            }
+        };
+
+        Ok(())
     }
 
     fn download_app_img(
