@@ -10,6 +10,12 @@ pub struct Config {
 pub struct GotifyConfig {
     pub url: url::Url,
     pub token: String,
+    #[serde(default = "default_gotify_max_missed")]
+    pub max_missed: u32,
+}
+
+const fn default_gotify_max_missed() -> u32 {
+    100
 }
 
 #[derive(Debug, Default, serde::Deserialize)]

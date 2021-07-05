@@ -37,6 +37,7 @@ Edit `~/.config/gotify-desktop/config.toml` with your server URL and client toke
 [gotify]
 url = "wss://SERVER_DOMAIN:SERVER_PORT"
 token = "YOUR_SECRET_TOKEN"
+max_missed = 100  # optional, when reconnecting after a connection loss, how many recent messages to fetch when looking for missed messages
 
 [notification]
 min_priority = 1  # optional, ignores messages with priority lower than given value
