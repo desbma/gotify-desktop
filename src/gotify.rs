@@ -2,6 +2,7 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::io::ErrorKind;
 use std::os::unix::io::AsRawFd;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::config;
@@ -22,7 +23,7 @@ pub struct Client {
     http_client: reqwest::blocking::Client,
     http_url: url::Url,
 
-    app_imgs: HashMap<i64, Option<String>>,
+    app_imgs: HashMap<i64, Option<PathBuf>>,
     xdg_dirs: xdg::BaseDirectories,
 
     last_msg_id: Option<i64>,
@@ -38,7 +39,7 @@ pub struct Message {
     pub date: String,
 
     #[serde(skip)]
-    pub app_img_filepath: Option<String>,
+    pub app_img_filepath: Option<PathBuf>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -68,7 +69,7 @@ lazy_static::lazy_static! {
 impl Client {
     pub fn new(config: &config::GotifyConfig) -> anyhow::Result<Client> {
         // Init app img cache
-        let app_imgs: HashMap<i64, Option<String>> = HashMap::new();
+        let app_imgs: HashMap<i64, Option<PathBuf>> = HashMap::new();
         let binary_name = env!("CARGO_PKG_NAME");
         let xdg_dirs = xdg::BaseDirectories::with_prefix(binary_name)?;
 
@@ -290,7 +291,7 @@ impl Client {
                 let new_entry = if let Ok(_metadata) = std::fs::metadata(&img_filepath) {
                     // && metadata.is_file()
                     // Image file already exists
-                    Some(img_filepath.into_os_string().into_string().unwrap())
+                    Some(img_filepath)
                 } else {
                     // Download image file if app has one
                     Self::download_app_img(
@@ -313,7 +314,7 @@ impl Client {
         client: &reqwest::blocking::Client,
         app_id: i64,
         img_filepath: &std::path::Path,
-    ) -> anyhow::Result<Option<String>> {
+    ) -> anyhow::Result<Option<PathBuf>> {
         // Get app info
         let mut url = http_url.to_owned();
         url.path_segments_mut()
@@ -336,13 +337,7 @@ impl Client {
             let mut img_file = std::fs::File::create(&img_filepath)?;
             std::io::copy(&mut img_response, &mut img_file)?;
             log::debug!("{:?} written", img_filepath);
-            Ok(Some(
-                img_filepath
-                    .to_owned()
-                    .into_os_string()
-                    .into_string()
-                    .unwrap(),
-            ))
+            Ok(Some(img_filepath.to_owned()))
         } else {
             Ok(None)
         }
