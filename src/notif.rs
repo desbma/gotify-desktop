@@ -15,7 +15,12 @@ pub fn show(msg: gotify::Message) -> anyhow::Result<()> {
         .body(&msg.message)
         .urgency(urgency);
     if let Some(img_filepath) = msg.app_img_filepath {
-        notif.icon(&img_filepath.into_os_string().into_string().unwrap());
+        notif.icon(
+            &img_filepath
+                .into_os_string()
+                .into_string()
+                .map_err(|p| anyhow::anyhow!("Unable to convert path {:?} to string", p))?,
+        );
     }
 
     notif.show()?;
