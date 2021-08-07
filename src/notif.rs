@@ -10,10 +10,9 @@ pub fn show(msg: gotify::Message) -> anyhow::Result<()> {
     };
 
     let mut notif = notify_rust::Notification::new();
-    notif
-        .summary(&msg.title)
-        .body(&msg.message)
-        .urgency(urgency);
+    notif.summary(&msg.title).body(&msg.message);
+    #[cfg(all(unix, not(target_os = "macos")))]
+    notif.urgency(urgency);
     if let Some(img_filepath) = msg.app_img_filepath {
         notif.icon(
             &img_filepath
