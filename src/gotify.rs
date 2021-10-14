@@ -251,6 +251,21 @@ impl Client {
         }
     }
 
+    pub fn delete_message(&mut self, msg_id: i64) -> anyhow::Result<()> {
+        let mut url = self.http_url.to_owned();
+        url.path_segments_mut()
+            .map_err(|_| anyhow::anyhow!("Invalid URL {}", self.http_url))?
+            .push("message")
+            .push(&format!("{}", msg_id));
+        log::debug!("{}", url);
+
+        let response = self.http_client.delete(url).send()?.error_for_status()?;
+        let json_data = response.text()?;
+        log::trace!("{}", json_data);
+
+        Ok(())
+    }
+
     fn set_app_img(&mut self, msg: &mut Message) -> anyhow::Result<()> {
         msg.app_img_filepath = match self.app_imgs.entry(msg.appid) {
             // Cache hit

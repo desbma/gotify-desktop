@@ -12,6 +12,9 @@ Small [Gotify](https://gotify.net/) daemon to receive messages and forward them 
 - Auto reconnect if server connection is lost (unreliable network, laptop suspend...), and get missed messages
 - Automatically download, cache, and show app icons
 - Fast and self contained binary (no runtime dependencies)
+- Optional features:
+  - ignore messages below a given priority level
+  - delete messages once received
 
 ## Installation
 
@@ -37,6 +40,7 @@ Edit `~/.config/gotify-desktop/config.toml` with your server URL and client toke
 [gotify]
 url = "wss://SERVER_DOMAIN:SERVER_PORT"
 token = "YOUR_SECRET_TOKEN"
+auto_delete = true  # optional, if true, deletes messages that have been handled, defaults to false
 
 [notification]
 min_priority = 1  # optional, ignores messages with priority lower than given value

@@ -2,13 +2,22 @@ mod config;
 mod gotify;
 mod notif;
 
-fn handle_message(message: gotify::Message, min_priority: i64) -> anyhow::Result<()> {
+fn handle_message(
+    message: gotify::Message,
+    min_priority: i64,
+    delete: bool,
+    client: &mut gotify::Client,
+) -> anyhow::Result<()> {
     log::info!("Got {:?}", message);
 
     if message.priority >= min_priority {
-        notif::show(message)?;
+        notif::show(&message)?;
     } else {
         log::debug!("Ignoring message of priority {}", message.priority);
+    }
+
+    if delete {
+        client.delete_message(message.id)?;
     }
 
     Ok(())
@@ -37,8 +46,13 @@ fn main() {
         if !missed_messages.is_empty() {
             log::info!("Catching up {} missed message(s)", missed_messages.len());
             for msg in missed_messages {
-                handle_message(msg, cfg.notification.min_priority)
-                    .expect("Failed to handle message");
+                handle_message(
+                    msg,
+                    cfg.notification.min_priority,
+                    cfg.gotify.auto_delete,
+                    &mut client,
+                )
+                .expect("Failed to handle message");
             }
         }
 
@@ -56,7 +70,13 @@ fn main() {
                 }
             };
 
-            handle_message(msg, cfg.notification.min_priority).expect("Failed to handle message");
+            handle_message(
+                msg,
+                cfg.notification.min_priority,
+                cfg.gotify.auto_delete,
+                &mut client,
+            )
+            .expect("Failed to handle message");
         }
     }
 }

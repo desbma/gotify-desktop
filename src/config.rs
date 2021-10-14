@@ -10,6 +10,8 @@ pub struct Config {
 pub struct GotifyConfig {
     pub url: url::Url,
     pub token: String,
+    #[serde(default)]
+    pub auto_delete: bool,
 }
 
 #[derive(Debug, Default, serde::Deserialize)]

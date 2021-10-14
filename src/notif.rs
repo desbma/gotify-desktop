@@ -1,7 +1,7 @@
 use crate::gotify;
 
 // Show notification
-pub fn show(msg: gotify::Message) -> anyhow::Result<()> {
+pub fn show(msg: &gotify::Message) -> anyhow::Result<()> {
     let urgency = match msg.priority {
         0..=3 => notify_rust::Urgency::Low,
         4..=7 => notify_rust::Urgency::Normal,
@@ -13,12 +13,11 @@ pub fn show(msg: gotify::Message) -> anyhow::Result<()> {
     notif.summary(&msg.title).body(&msg.message);
     #[cfg(all(unix, not(target_os = "macos")))]
     notif.urgency(urgency);
-    if let Some(img_filepath) = msg.app_img_filepath {
+    if let Some(img_filepath) = &msg.app_img_filepath.as_ref() {
         notif.icon(
-            &img_filepath
-                .into_os_string()
-                .into_string()
-                .map_err(|p| anyhow::anyhow!("Unable to convert path {:?} to string", p))?,
+            img_filepath
+                .to_str()
+                .ok_or_else(|| anyhow::anyhow!("Unable to convert path to string"))?,
         );
     }
 
