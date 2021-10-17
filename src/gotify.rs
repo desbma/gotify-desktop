@@ -58,7 +58,10 @@ struct AppInfo {
 }
 
 type WebSocket = tungstenite::WebSocket<
-    tungstenite::stream::Stream<std::net::TcpStream, native_tls::TlsStream<std::net::TcpStream>>,
+    tungstenite::stream::Stream<
+        std::net::TcpStream,
+        rustls::StreamOwned<rustls::ClientSession, std::net::TcpStream>,
+    >,
 >;
 
 lazy_static::lazy_static! {
