@@ -1,3 +1,5 @@
+use anyhow::Context;
+
 mod config;
 mod gotify;
 mod notif;
@@ -23,26 +25,28 @@ fn handle_message(
     Ok(())
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     // Init logger
-    simple_logger::SimpleLogger::new().init().unwrap();
+    simple_logger::SimpleLogger::new()
+        .init()
+        .context("Failed to init logger")?;
 
     // Parse config
-    let cfg = config::parse_config().expect("Failed to read config");
+    let cfg = config::parse_config().context("Failed to read config")?;
 
     // Init client
-    let mut client = gotify::Client::new(&cfg.gotify).expect("Failed to setup client");
+    let mut client = gotify::Client::new(&cfg.gotify).context("Failed to setup client")?;
 
     // Connect loop
     loop {
         // Connect
-        client.connect().expect("Failed to connect");
+        client.connect().context("Failed to connect")?;
         log::info!("Connected to {}", cfg.gotify.url);
 
         // Handle missed messages
         let missed_messages = client
             .get_missed_messages()
-            .expect("Failed to get missed messages");
+            .context("Failed to get missed messages")?;
         if !missed_messages.is_empty() {
             log::info!("Catching up {} missed message(s)", missed_messages.len());
             for msg in missed_messages {
@@ -52,7 +56,7 @@ fn main() {
                     cfg.gotify.auto_delete,
                     &mut client,
                 )
-                .expect("Failed to handle message");
+                .context("Failed to handle message")?;
             }
         }
 
@@ -65,7 +69,7 @@ fn main() {
                     if e.downcast_ref::<gotify::NeedsReconnect>().is_some() {
                         break;
                     }
-                    res.expect("Failed to get message");
+                    res.context("Failed to get message")?;
                     unreachable!();
                 }
             };
@@ -76,7 +80,7 @@ fn main() {
                 cfg.gotify.auto_delete,
                 &mut client,
             )
-            .expect("Failed to handle message");
+            .context("Failed to handle message")?;
         }
     }
 }

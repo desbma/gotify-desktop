@@ -10,7 +10,7 @@ codegen-units = 1
 panic = "abort"
 
 [dependencies]
-anyhow = "1.0"
+anyhow = { version = "1.0", features = ["backtrace"] }
 backoff = { version = "0.3", default-features = false }
 lazy_static = "1.4"
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"] }
