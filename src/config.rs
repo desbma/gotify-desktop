@@ -4,6 +4,9 @@ pub struct Config {
 
     #[serde(default)]
     pub notification: NotificationConfig,
+
+    #[serde(default)]
+    pub action: ActionConfig,
 }
 
 #[derive(Clone, Debug, serde::Deserialize)]
@@ -17,6 +20,11 @@ pub struct GotifyConfig {
 #[derive(Debug, Default, serde::Deserialize)]
 pub struct NotificationConfig {
     pub min_priority: i64,
+}
+
+#[derive(Debug, Default, serde::Deserialize)]
+pub struct ActionConfig {
+    pub on_msg_command: Option<String>,
 }
 
 pub fn parse_config() -> anyhow::Result<Config> {

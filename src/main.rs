@@ -1,12 +1,35 @@
+use std::process::Command;
+
 use anyhow::Context;
 
 mod config;
 mod gotify;
 mod notif;
 
+fn run_on_msg_command(
+    message: &gotify::Message,
+    on_msg_command: &(String, Vec<String>),
+) -> anyhow::Result<()> {
+    log::info!(
+        "Running on message command: {} {}",
+        on_msg_command.0,
+        on_msg_command.1.join(" ")
+    );
+    Command::new(&on_msg_command.0)
+        .args(&on_msg_command.1)
+        .env("GOTIFY_MSG_PRIORITY", &format!("{}", message.priority))
+        .env("GOTIFY_MSG_TITLE", &message.title)
+        .env("GOTIFY_MSG_TEXT", &message.message)
+        .status()?;
+    //.exit_ok()?;
+
+    Ok(())
+}
+
 fn handle_message(
     message: gotify::Message,
     min_priority: i64,
+    on_msg_command: Option<&(String, Vec<String>)>,
     delete: bool,
     client: &mut gotify::Client,
 ) -> anyhow::Result<()> {
@@ -15,7 +38,16 @@ fn handle_message(
     if message.priority >= min_priority {
         notif::show(&message)?;
     } else {
-        log::debug!("Ignoring message of priority {}", message.priority);
+        log::debug!(
+            "Ignoring notification for message of priority {}",
+            message.priority
+        );
+    }
+
+    if let Some(on_msg_command) = on_msg_command {
+        if let Err(e) = run_on_msg_command(&message, on_msg_command) {
+            log::warn!("Command {:?} failed with error: {:?}", on_msg_command, e);
+        }
     }
 
     if delete {
@@ -33,6 +65,16 @@ fn main() -> anyhow::Result<()> {
 
     // Parse config
     let cfg = config::parse_config().context("Failed to read config")?;
+    let on_msg_command = match cfg.action.on_msg_command {
+        None => None,
+        Some(cmd) => Some(
+            shlex::split(&cmd)
+                .context(format!("Failed to split command arguments for {:?}", cmd))?
+                .split_first()
+                .map(|t| (t.0.to_owned(), t.1.to_owned()))
+                .ok_or_else(|| anyhow::anyhow!("Empty command"))?,
+        ),
+    };
 
     // Init client
     let mut client = gotify::Client::new(&cfg.gotify).context("Failed to setup client")?;
@@ -53,6 +95,7 @@ fn main() -> anyhow::Result<()> {
                 handle_message(
                     msg,
                     cfg.notification.min_priority,
+                    on_msg_command.as_ref(),
                     cfg.gotify.auto_delete,
                     &mut client,
                 )
@@ -77,6 +120,7 @@ fn main() -> anyhow::Result<()> {
             handle_message(
                 msg,
                 cfg.notification.min_priority,
+                on_msg_command.as_ref(),
                 cfg.gotify.auto_delete,
                 &mut client,
             )

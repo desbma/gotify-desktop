@@ -44,6 +44,10 @@ auto_delete = true  # optional, if true, deletes messages that have been handled
 
 [notification]
 min_priority = 1  # optional, ignores messages with priority lower than given value
+
+[action]
+# optional, run the given command for each message, with the following environment variables set: GOTIFY_MSG_PRIORITY, GOTIFY_MSG_TITLE and GOTIFY_MSG_TEXT.
+on_msg_command = "/usr/bin/beep"
 ```
 
 ## Usage
