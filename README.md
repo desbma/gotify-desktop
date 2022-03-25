@@ -15,6 +15,7 @@ Small [Gotify](https://gotify.net/) daemon to receive messages and forward them 
 - Optional features:
   - ignore messages below a given priority level
   - delete messages once received
+  - run command on each received message
 
 ## Installation
 
