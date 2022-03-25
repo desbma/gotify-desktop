@@ -10,6 +10,7 @@ cd "$(git rev-parse --show-toplevel)"
 sed -i "s/^\(version = \"\).*\(\"\)/\1$VERSION\2/w /dev/stdout" Cargo.toml
 
 cargo update
+cargo check && cargo test
 
 git add Cargo.{toml,lock}
 
