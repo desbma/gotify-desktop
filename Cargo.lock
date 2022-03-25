@@ -537,7 +537,7 @@ checksum = "78cc372d058dcf6d5ecd98510e7fbc9e5aec4d21de70f65fea8fecebcd881bd4"
 
 [[package]]
 name = "gotify-desktop"
-version = "1.3.0"
+version = "1.3.1"
 dependencies = [
  "anyhow",
  "backoff",
