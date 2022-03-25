@@ -1,3 +1,5 @@
+//! Gotify desktop daemon
+
 use std::process::Command;
 
 use anyhow::Context;
@@ -6,6 +8,7 @@ mod config;
 mod gotify;
 mod notif;
 
+/// Run configured command on message reception
 fn run_on_msg_command(
     message: &gotify::Message,
     on_msg_command: &(String, Vec<String>),
@@ -26,6 +29,7 @@ fn run_on_msg_command(
     Ok(())
 }
 
+/// Process new message
 fn handle_message(
     message: gotify::Message,
     min_priority: i64,
@@ -57,6 +61,7 @@ fn handle_message(
     Ok(())
 }
 
+/// Program entry point
 fn main() -> anyhow::Result<()> {
     // Init logger
     simple_logger::SimpleLogger::new()

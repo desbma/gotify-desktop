@@ -1,3 +1,5 @@
+//! Gotify network & parsing code
+
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::io::ErrorKind;
@@ -7,56 +9,85 @@ use std::time::Duration;
 
 use crate::config;
 
+/// Error when socket is stale and needs reconnect
 #[derive(thiserror::Error, Debug)]
 #[error(transparent)]
 pub struct NeedsReconnect {
+    /// Inner poll error
     #[from]
     inner: std::io::Error,
 }
 
+/// Gotify client state
 pub struct Client {
+    /// Local config
     config: config::GotifyConfig,
 
+    /// Websocket client, if connected
     ws: Option<WebSocket>,
+    /// Socket poller
     poller: Option<mio::Poll>,
 
+    /// HTTP client (non websocket)
     http_client: reqwest::blocking::Client,
+    /// Gotify HTTP(S) URL
     http_url: url::Url,
 
+    /// App image cache
     app_imgs: HashMap<i64, Option<PathBuf>>,
+    /// XDG dirs
     xdg_dirs: xdg::BaseDirectories,
 
+    /// Last received Gotify message id
     last_msg_id: Option<i64>,
 }
 
+/// Gotify message
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Message {
+    /// Gotify id
     pub id: i64,
+    /// App id
     pub appid: i64,
+    /// Message text
     pub message: String,
+    /// Message title
     pub title: String,
+    /// Message priority
     pub priority: i64,
+    /// Message date & time
     pub date: String,
 
+    /// App image filepath
     #[serde(skip)]
     pub app_img_filepath: Option<PathBuf>,
 }
 
+/// Gotify message bunch
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct AllMessages {
+    /// The actual messages
     messages: Vec<Message>,
 }
 
+/// Gotify app metadata
 #[derive(serde::Serialize, serde::Deserialize)]
 struct AppInfo {
+    /// unused
     description: String,
+    /// App id
     id: i64,
+    /// Image URL
     image: String,
+    /// unused
     internal: bool,
+    /// App name
     name: String,
+    /// unused
     token: String,
 }
 
+/// HTTP or HTTPS websocket
 type WebSocket = tungstenite::WebSocket<
     tungstenite::stream::Stream<std::net::TcpStream, native_tls::TlsStream<std::net::TcpStream>>,
 >;
@@ -67,6 +98,7 @@ lazy_static::lazy_static! {
 }
 
 impl Client {
+    /// Constructor
     pub fn new(config: &config::GotifyConfig) -> anyhow::Result<Client> {
         // Init app img cache
         let app_imgs: HashMap<i64, Option<PathBuf>> = HashMap::new();
@@ -102,6 +134,7 @@ impl Client {
         })
     }
 
+    /// Connect gotify client, with retries
     pub fn connect(&mut self) -> anyhow::Result<()> {
         let log_failed_attempt = |err, duration| {
             log::warn!("Connection failed: {}, retrying in {:?}", err, duration);
@@ -126,6 +159,7 @@ impl Client {
         })
     }
 
+    /// Connect gotify client
     fn try_connect(&mut self) -> anyhow::Result<()> {
         // WS connect & handshake
         let mut url = self.config.url.to_owned();
@@ -168,6 +202,7 @@ impl Client {
         Ok(())
     }
 
+    /// Catch up missed messages since the last received one
     pub fn get_missed_messages(&mut self) -> anyhow::Result<Vec<Message>> {
         let mut missed_messages: Vec<Message> = if let Some(last_msg_id) = self.last_msg_id {
             // Get all recent messages
@@ -204,6 +239,7 @@ impl Client {
         Ok(missed_messages)
     }
 
+    /// Get pending gotify messages
     pub fn get_message(&mut self) -> anyhow::Result<Message> {
         let ws = self.ws.as_mut().unwrap();
         let poller = self.poller.as_mut().unwrap();
@@ -251,6 +287,7 @@ impl Client {
         }
     }
 
+    /// Delete gotify message
     pub fn delete_message(&mut self, msg_id: i64) -> anyhow::Result<()> {
         let mut url = self.http_url.to_owned();
         url.path_segments_mut()
@@ -266,6 +303,7 @@ impl Client {
         Ok(())
     }
 
+    /// Download (or get from cache) and set app image for a message
     fn set_app_img(&mut self, msg: &mut Message) -> anyhow::Result<()> {
         msg.app_img_filepath = match self.app_imgs.entry(msg.appid) {
             // Cache hit
@@ -324,6 +362,7 @@ impl Client {
         Ok(())
     }
 
+    /// Download Gotify app image
     fn download_app_img(
         http_url: &url::Url,
         client: &reqwest::blocking::Client,

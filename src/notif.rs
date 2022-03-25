@@ -1,6 +1,8 @@
+//! Desktop notification
+
 use crate::gotify;
 
-// Show notification
+/// Show notification
 pub fn show(msg: &gotify::Message) -> anyhow::Result<()> {
     let urgency = match msg.priority {
         0..=3 => notify_rust::Urgency::Low,

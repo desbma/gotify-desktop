@@ -27,6 +27,7 @@ repos:
     hooks:
       - id: cargo-check
       - id: clippy
+        args: ["--", "-D", "warnings", "-D", "clippy::missing_docs_in_private_items"]
       - id: fmt
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
