@@ -7,7 +7,7 @@ Small [Gotify](https://gotify.net/) daemon to receive messages and forward them 
 
 ## Features
 
-- Read Gotify messages, and forward them as [standard desktop notification](https://www.galago-project.org/specs/notification/0.9/index.html) (should work on must Unix variants)
+- Read Gotify messages, and forward them as [standard desktop notification](https://specifications.freedesktop.org/notification-spec/notification-spec-latest.html) (should work on must Unix variants)
 - Forward message priority
 - Auto reconnect if server connection is lost (unreliable network, laptop suspend...), and get missed messages
 - Automatically download, cache, and show app icons
