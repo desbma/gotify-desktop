@@ -293,7 +293,7 @@ impl Client {
         url.path_segments_mut()
             .map_err(|_| anyhow::anyhow!("Invalid URL {}", self.http_url))?
             .push("message")
-            .push(&format!("{}", msg_id));
+            .push(&format!("{msg_id}"));
         log::debug!("{}", url);
 
         let response = self.http_client.delete(url).send()?.error_for_status()?;
@@ -310,7 +310,7 @@ impl Client {
             Entry::Occupied(e) => match e.get() {
                 None => None,
                 Some(img_filepath) => {
-                    if let Ok(_metadata) = std::fs::metadata(&img_filepath) {
+                    if let Ok(_metadata) = std::fs::metadata(img_filepath) {
                         // Image file already exists
                         Some(img_filepath.to_owned())
                     } else {
@@ -388,7 +388,7 @@ impl Client {
             let img_url = http_url.to_owned().join(&matching_app.image)?;
             log::debug!("{}", img_url);
             let mut img_response = client.get(img_url).send()?.error_for_status()?;
-            let mut img_file = std::fs::File::create(&img_filepath)?;
+            let mut img_file = std::fs::File::create(img_filepath)?;
             std::io::copy(&mut img_response, &mut img_file)?;
             log::debug!("{:?} written", img_filepath);
             Ok(Some(img_filepath.to_owned()))
