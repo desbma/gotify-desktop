@@ -115,6 +115,7 @@ fn main() -> anyhow::Result<()> {
                 Ok(m) => m,
                 Err(ref e) => {
                     if e.downcast_ref::<gotify::NeedsReconnect>().is_some() {
+                        log::warn!("Error while waiting for message: {e}, will try to reconnect");
                         break;
                     }
                     res.context("Failed to get message")?;

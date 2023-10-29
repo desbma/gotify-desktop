@@ -7,15 +7,18 @@ use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use tungstenite::error::ProtocolError;
+
 use crate::config;
 
-/// Error when socket is stale and needs reconnect
+/// Error when socket needs reconnect
 #[derive(thiserror::Error, Debug)]
 #[error(transparent)]
-pub struct NeedsReconnect {
+pub enum NeedsReconnect {
     /// Inner poll error
-    #[from]
-    inner: std::io::Error,
+    Io(#[from] std::io::Error),
+    /// Protocol disconnect
+    Protocol(#[from] ProtocolError),
 }
 
 /// Gotify client state
@@ -252,7 +255,7 @@ impl Client {
             let poll_res = poller.poll(&mut poller_events, None);
             match poll_res {
                 Err(e) if e.kind() == ErrorKind::Interrupted => {
-                    return Err(NeedsReconnect { inner: e }.into());
+                    return Err(NeedsReconnect::Io(e).into());
                 }
                 Err(_) => poll_res.unwrap(),
                 _ => {}
@@ -260,9 +263,19 @@ impl Client {
             if poller_events.is_empty() {
                 continue;
             }
+            log::trace!("Event: {:?}", poller_events);
 
             // Read message
-            let ws_msg = ws.read_message()?;
+            let read_res = ws.read_message();
+            let ws_msg = match read_res {
+                Ok(m) => m,
+                Err(tungstenite::Error::Protocol(e))
+                    if matches!(e, ProtocolError::ResetWithoutClosingHandshake) =>
+                {
+                    return Err(NeedsReconnect::Protocol(e).into());
+                }
+                Err(_) => read_res?,
+            };
             log::trace!("Got message: {:?}", ws_msg);
 
             // Check message type
