@@ -1,6 +1,7 @@
 # Gotify desktop
 
 [![Build status](https://github.com/desbma/gotify-desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/desbma/gotify-desktop/actions)
+[![AUR version](https://img.shields.io/aur/version/gotify-desktop.svg?style=flat)](https://aur.archlinux.org/packages/gotify-desktop/)
 [![License](https://img.shields.io/github/license/desbma/gotify-desktop.svg?style=flat)](https://github.com/desbma/gotify-desktop/blob/master/LICENSE)
 
 Small [Gotify](https://gotify.net/) daemon to receive messages and forward them as desktop notifications.
