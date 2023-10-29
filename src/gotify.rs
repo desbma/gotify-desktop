@@ -7,7 +7,8 @@ use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use tungstenite::error::ProtocolError;
+use reqwest::header::HeaderValue;
+use tungstenite::{client::IntoClientRequest, error::ProtocolError};
 
 use crate::config;
 
@@ -91,9 +92,7 @@ struct AppInfo {
 }
 
 /// HTTP or HTTPS websocket
-type WebSocket = tungstenite::WebSocket<
-    tungstenite::stream::Stream<std::net::TcpStream, native_tls::TlsStream<std::net::TcpStream>>,
->;
+type WebSocket = tungstenite::WebSocket<tungstenite::stream::MaybeTlsStream<std::net::TcpStream>>;
 
 lazy_static::lazy_static! {
     static ref USER_AGENT: String =
@@ -153,12 +152,12 @@ impl Client {
         };
         backoff::retry_notify(
             retrier,
-            || self.try_connect().map_err(backoff::Error::Transient),
+            || self.try_connect().map_err(backoff::Error::transient),
             log_failed_attempt,
         )
         .map_err(|e| match e {
             backoff::Error::Permanent(e) => e,
-            backoff::Error::Transient(e) => e,
+            backoff::Error::Transient { err, .. } => err,
         })
     }
 
@@ -169,11 +168,10 @@ impl Client {
         url.path_segments_mut()
             .map_err(|_| anyhow::anyhow!("Invalid URL {}", self.config.url))?
             .push("stream");
-        let request = tungstenite::handshake::client::Request::builder()
-            .uri(url.to_string())
-            .header("User-Agent", &*USER_AGENT)
-            .header("X-Gotify-Key", &self.config.token)
-            .body(())?;
+        let mut request = url.into_client_request()?;
+        let headers = request.headers_mut();
+        headers.insert("User-Agent", HeaderValue::from_str(&USER_AGENT)?);
+        headers.insert("X-Gotify-Key", HeaderValue::from_str(&self.config.token)?);
         let (mut ws, response) = tungstenite::connect(request)?;
 
         // Check response
@@ -190,9 +188,10 @@ impl Client {
         // Setup poller
         let poller = mio::Poll::new()?;
         let poller_registry = poller.registry();
-        let fd = match &ws.get_ref() {
-            tungstenite::stream::Stream::Plain(s) => s.as_raw_fd(),
-            tungstenite::stream::Stream::Tls(t) => t.get_ref().as_raw_fd(),
+        let fd = match ws.get_ref() {
+            tungstenite::stream::MaybeTlsStream::Plain(s) => s.as_raw_fd(),
+            tungstenite::stream::MaybeTlsStream::NativeTls(t) => t.get_ref().as_raw_fd(),
+            _ => unimplemented!(),
         };
         poller_registry.register(
             &mut mio::unix::SourceFd(&fd),
@@ -266,7 +265,7 @@ impl Client {
             log::trace!("Event: {:?}", poller_events);
 
             // Read message
-            let read_res = ws.read_message();
+            let read_res = ws.read();
             let ws_msg = match read_res {
                 Ok(m) => m,
                 Err(tungstenite::Error::Protocol(e))
@@ -282,7 +281,7 @@ impl Client {
             let msg_str = match ws_msg {
                 tungstenite::protocol::Message::Text(msg_str) => msg_str,
                 tungstenite::protocol::Message::Ping(_) => {
-                    ws.write_pending()?;
+                    ws.flush()?;
                     continue;
                 }
                 _ => anyhow::bail!("Unexpected message type: {:?}", ws_msg),
