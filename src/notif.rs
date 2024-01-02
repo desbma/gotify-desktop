@@ -9,7 +9,10 @@ pub fn show(msg: &gotify::Message) -> anyhow::Result<()> {
         0..=3 => notify_rust::Urgency::Low,
         4..=7 => notify_rust::Urgency::Normal,
         8..=10 => notify_rust::Urgency::Critical,
-        v => anyhow::bail!("Unexpected urgency value {}", v),
+        v => {
+            log::warn!("Unexpected urgency value {}", v);
+            notify_rust::Urgency::Normal
+        }
     };
 
     let mut notif = notify_rust::Notification::new();
