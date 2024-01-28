@@ -1,0 +1,7 @@
+[Desktop Entry]
+Version=1.5
+Type=Application
+Name=Gotify Desktop daemon
+Comment=Start Gotify Desktop notification daemon
+Exec=gotify-desktop
+Categories=System;

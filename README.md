@@ -26,7 +26,16 @@ You need a Rust build environment for example from [rustup](https://rustup.rs/).
 
 ```
 cargo build --release
-install -Dm 755 -t /usr/local/bin target/release/gotify-desktop
+sudo install -Dm 755 -t /usr/local/bin target/release/gotify-desktop
+```
+
+If you want to add a [Desktop Entry](https://specifications.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html):
+
+```
+sudo install -Dm 755 desktop/gotify-desktop.desktop /usr/share/applications/gotify-desktop.desktop
+sudo install -Dm 755 desktop/icon.png /usr/share/icons/hicolor/96x96/apps/gotify-desktop.png
+# update icon cache
+sudo gtk-update-icon-cache /usr/share/icons/hicolor/96x96/apps/gotify-desktop.png
 ```
 
 ### From AUR
