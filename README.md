@@ -33,9 +33,10 @@ If you want to add a [Desktop Entry](https://specifications.freedesktop.org/desk
 
 ```
 sudo install -Dm 755 desktop/gotify-desktop.desktop /usr/share/applications/gotify-desktop.desktop
-sudo install -Dm 755 desktop/icon.png /usr/share/icons/hicolor/96x96/apps/gotify-desktop.png
-# update icon cache
-sudo gtk-update-icon-cache /usr/share/icons/hicolor/96x96/apps/gotify-desktop.png
+curl https://raw.githubusercontent.com/gotify/logo/master/gotify-logo-small.svg -o /tmp/gotify-logo-small.svg
+sudo install -Dm 755 /tmp/gotify-logo-small.svg /usr/share/icons/hicolor/scalable/apps/gotify-desktop.svg
+# update icon cache (may differ depending on Linux distribution)
+sudo gtk-update-icon-cache /usr/share/icons/hicolor/
 ```
 
 ### From AUR
