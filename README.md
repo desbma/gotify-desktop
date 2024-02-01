@@ -32,9 +32,9 @@ sudo install -Dm 755 -t /usr/local/bin target/release/gotify-desktop
 If you want to add a [Desktop Entry](https://specifications.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html):
 
 ```
-sudo install -Dm 755 desktop/gotify-desktop.desktop /usr/share/applications/gotify-desktop.desktop
+sudo install -Dm 644 desktop/gotify-desktop.desktop /usr/share/applications/gotify-desktop.desktop
 curl https://raw.githubusercontent.com/gotify/logo/master/gotify-logo-small.svg -o /tmp/gotify-logo-small.svg
-sudo install -Dm 755 /tmp/gotify-logo-small.svg /usr/share/icons/hicolor/scalable/apps/gotify-desktop.svg
+sudo install -Dm 644 /tmp/gotify-logo-small.svg /usr/share/icons/hicolor/scalable/apps/gotify-desktop.svg
 # update icon cache (may differ depending on Linux distribution)
 sudo gtk-update-icon-cache /usr/share/icons/hicolor/
 ```
