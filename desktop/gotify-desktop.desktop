@@ -4,4 +4,5 @@ Type=Application
 Name=Gotify Desktop daemon
 Comment=Start Gotify Desktop notification daemon
 Exec=gotify-desktop
+Icon=gotify-desktop
 Categories=System;
