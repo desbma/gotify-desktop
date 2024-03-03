@@ -22,7 +22,7 @@ fn run_on_msg_command(
         .args(&on_msg_command.1)
         .env("GOTIFY_MSG_PRIORITY", &format!("{}", message.priority))
         .env("GOTIFY_MSG_TITLE", &message.title)
-        .env("GOTIFY_MSG_TEXT", &message.message)
+        .env("GOTIFY_MSG_TEXT", &message.text)
         .status()?;
     //.exit_ok()?;
 
@@ -31,7 +31,7 @@ fn run_on_msg_command(
 
 /// Process new message
 fn handle_message(
-    message: gotify::Message,
+    message: &gotify::Message,
     min_priority: i64,
     on_msg_command: Option<&(String, Vec<String>)>,
     delete: bool,
@@ -40,7 +40,7 @@ fn handle_message(
     log::info!("Got {:?}", message);
 
     if message.priority >= min_priority {
-        notif::show(&message)?;
+        notif::show(message)?;
     } else {
         log::debug!(
             "Ignoring notification for message of priority {}",
@@ -49,7 +49,7 @@ fn handle_message(
     }
 
     if let Some(on_msg_command) = on_msg_command {
-        if let Err(e) = run_on_msg_command(&message, on_msg_command) {
+        if let Err(e) = run_on_msg_command(message, on_msg_command) {
             log::warn!("Command {:?} failed with error: {:?}", on_msg_command, e);
         }
     }
@@ -69,7 +69,7 @@ fn main() -> anyhow::Result<()> {
         .context("Failed to init logger")?;
 
     // Parse config
-    let cfg = config::parse_config().context("Failed to read config")?;
+    let cfg = config::parse().context("Failed to read config")?;
     let on_msg_command = match cfg.action.on_msg_command {
         None => None,
         Some(cmd) => Some(
@@ -98,7 +98,7 @@ fn main() -> anyhow::Result<()> {
             log::info!("Catching up {} missed message(s)", missed_messages.len());
             for msg in missed_messages {
                 handle_message(
-                    msg,
+                    &msg,
                     cfg.notification.min_priority,
                     on_msg_command.as_ref(),
                     cfg.gotify.auto_delete,
@@ -124,7 +124,7 @@ fn main() -> anyhow::Result<()> {
             };
 
             handle_message(
-                msg,
+                &msg,
                 cfg.notification.min_priority,
                 on_msg_command.as_ref(),
                 cfg.gotify.auto_delete,

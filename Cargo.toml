@@ -15,7 +15,6 @@ backoff = { version = "0.4.0", default-features = false }
 lazy_static = { version = "1.4", default-features = false }
 log = { version = "0.4.20", default-features = false, features = ["max_level_trace", "release_max_level_info"] }
 mio = { version = "0.8.9", default-features = false, features = ["os-ext"] }
-native-tls = { version = "0.2.11", default-features = false }
 notify-rust = { version = "4.9.0", default-features = false, features = ["serde", "zbus"] }
 reqwest = { version = "0.11.22", default-features = false, features = ["native-tls", "blocking", "gzip"] }
 serde = { version = "1.0.190", default-features = false, features = ["std"] }
@@ -27,3 +26,32 @@ toml = { version = "0.8.6", default-features = false, features = ["parse"] }
 tungstenite = { version = "0.20.1", default-features = false, features = ["native-tls", "handshake"] }
 url = { version = "2.4.1", default-features = false, features = ["serde"] }
 xdg = { version = "2.5.2", default-features = false }
+
+[lints.rust]
+missing_docs = "warn"
+# unreachable_pub = "warn"
+unsafe_code = "forbid"
+unused_crate_dependencies = "warn"
+
+[lints.clippy]
+pedantic = "warn"
+# from clippy::restrictions
+clone_on_ref_ptr = "warn"
+dbg_macro = "warn"
+expect_used = "warn"
+format_push_string = "warn"
+if_then_some_else_none = "warn"
+missing_docs_in_private_items = "warn"
+multiple_inherent_impl = "warn"
+panic = "warn"
+redundant_type_annotations = "warn"
+# ref_patterns = "warn"
+same_name_method = "warn"
+self_named_module_files = "warn"
+semicolon_inside_block = "warn"
+shadow_unrelated = "warn"
+str_to_string = "warn"
+string_to_string = "warn"
+unneeded_field_pattern = "warn"
+unwrap_used = "warn"
+verbose_file_reads = "warn"

@@ -16,6 +16,7 @@ pub struct Config {
 }
 
 /// Gotify specific local configuration
+#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct GotifyConfig {
     /// Gotify base URL
@@ -28,6 +29,7 @@ pub struct GotifyConfig {
 }
 
 /// Notification specific local configuration
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Default, serde::Deserialize)]
 pub struct NotificationConfig {
     /// Minimum priority below which to disable message notification
@@ -35,6 +37,7 @@ pub struct NotificationConfig {
 }
 
 /// Action specific local configuration
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Default, serde::Deserialize)]
 pub struct ActionConfig {
     /// Command to run on message reception
@@ -42,7 +45,7 @@ pub struct ActionConfig {
 }
 
 /// Parse local configuration
-pub fn parse_config() -> anyhow::Result<Config> {
+pub fn parse() -> anyhow::Result<Config> {
     let binary_name = env!("CARGO_PKG_NAME");
     let xdg_dirs = xdg::BaseDirectories::with_prefix(binary_name)?;
     let config_filepath = xdg_dirs

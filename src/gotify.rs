@@ -33,6 +33,7 @@ pub struct Client {
     poller: Option<mio::Poll>,
 
     /// HTTP client (non websocket)
+    #[allow(clippy::struct_field_names)]
     http_client: reqwest::blocking::Client,
     /// Gotify HTTP(S) URL
     http_url: url::Url,
@@ -54,7 +55,8 @@ pub struct Message {
     /// App id
     pub appid: i64,
     /// Message text
-    pub message: String,
+    #[serde(rename = "message")]
+    pub text: String,
     /// Message title
     pub title: String,
     /// Message priority
@@ -116,12 +118,13 @@ impl Client {
             .user_agent(&*USER_AGENT)
             .default_headers(http_headers)
             .build()?;
-        let mut url = config.url.to_owned();
+        let mut url = config.url.clone();
         let scheme = match url.scheme() {
             "wss" => "https",
             "ws" => "http",
             s => anyhow::bail!("Unexpected scheme {:?}", s),
         };
+        #[allow(clippy::unwrap_used)] // We know the scheme is valid here
         url.set_scheme(scheme).unwrap();
 
         Ok(Client {
@@ -164,9 +167,9 @@ impl Client {
     /// Connect gotify client
     fn try_connect(&mut self) -> anyhow::Result<()> {
         // WS connect & handshake
-        let mut url = self.config.url.to_owned();
+        let mut url = self.config.url.clone();
         url.path_segments_mut()
-            .map_err(|_| anyhow::anyhow!("Invalid URL {}", self.config.url))?
+            .map_err(|()| anyhow::anyhow!("Invalid URL {}", self.config.url))?
             .push("stream");
         let mut request = url.into_client_request()?;
         let headers = request.headers_mut();
@@ -208,9 +211,9 @@ impl Client {
     pub fn get_missed_messages(&mut self) -> anyhow::Result<Vec<Message>> {
         let mut missed_messages: Vec<Message> = if let Some(last_msg_id) = self.last_msg_id {
             // Get all recent messages
-            let mut url = self.http_url.to_owned();
+            let mut url = self.http_url.clone();
             url.path_segments_mut()
-                .map_err(|_| anyhow::anyhow!("Invalid URL {}", self.http_url))?
+                .map_err(|()| anyhow::anyhow!("Invalid URL {}", self.http_url))?
                 .push("message");
             url.query_pairs_mut().append_pair("limit", "200");
             log::debug!("{}", url);
@@ -230,7 +233,7 @@ impl Client {
             vec![]
         };
 
-        for missed_message in missed_messages.iter_mut() {
+        for missed_message in &mut missed_messages {
             self.set_app_img(missed_message)?;
         }
 
@@ -243,8 +246,14 @@ impl Client {
 
     /// Get pending gotify messages
     pub fn get_message(&mut self) -> anyhow::Result<Message> {
-        let ws = self.ws.as_mut().unwrap();
-        let poller = self.poller.as_mut().unwrap();
+        let ws = self
+            .ws
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("Not connected"))?;
+        let poller = self
+            .poller
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("Not connected"))?;
 
         loop {
             // Poll to detect stale socket, so we can trigger reconnect,
@@ -256,7 +265,7 @@ impl Client {
                 Err(e) if e.kind() == ErrorKind::Interrupted => {
                     return Err(NeedsReconnect::Io(e).into());
                 }
-                Err(_) => poll_res.unwrap(),
+                Err(_) => poll_res?,
                 _ => {}
             }
             if poller_events.is_empty() {
@@ -301,9 +310,9 @@ impl Client {
 
     /// Delete gotify message
     pub fn delete_message(&mut self, msg_id: i64) -> anyhow::Result<()> {
-        let mut url = self.http_url.to_owned();
+        let mut url = self.http_url.clone();
         url.path_segments_mut()
-            .map_err(|_| anyhow::anyhow!("Invalid URL {}", self.http_url))?
+            .map_err(|()| anyhow::anyhow!("Invalid URL {}", self.http_url))?
             .push("message")
             .push(&format!("{msg_id}"));
         log::debug!("{}", url);
@@ -321,18 +330,18 @@ impl Client {
             // Cache hit
             Entry::Occupied(e) => match e.get() {
                 None => None,
-                Some(img_filepath) => {
-                    if let Ok(_metadata) = std::fs::metadata(img_filepath) {
+                Some(cache_hit_img_filepath) => {
+                    if let Ok(_metadata) = std::fs::metadata(cache_hit_img_filepath) {
                         // Image file already exists
-                        Some(img_filepath.to_owned())
+                        Some(cache_hit_img_filepath.to_owned())
                     } else {
                         log::warn!(
                             "File {:?} has been removed, will try to download it again",
-                            img_filepath
+                            cache_hit_img_filepath
                         );
 
                         // Create cache path
-                        let img_filepath = self
+                        let new_img_filepath = self
                             .xdg_dirs
                             .place_cache_file(format!("app-{}.png", msg.appid))?;
 
@@ -341,7 +350,7 @@ impl Client {
                             &self.http_url,
                             &self.http_client,
                             msg.appid,
-                            &img_filepath,
+                            &new_img_filepath,
                         )?
                     }
                 }
@@ -366,7 +375,7 @@ impl Client {
                         &img_filepath,
                     )?
                 };
-                e.insert(new_entry.to_owned());
+                e.insert(new_entry.clone());
                 new_entry
             }
         };
@@ -384,7 +393,7 @@ impl Client {
         // Get app info
         let mut url = http_url.to_owned();
         url.path_segments_mut()
-            .map_err(|_| anyhow::anyhow!("Invalid URL {}", http_url))?
+            .map_err(|()| anyhow::anyhow!("Invalid URL {}", http_url))?
             .push("application");
         log::debug!("{}", url);
         let response = client.get(url).send()?.error_for_status()?;
@@ -393,11 +402,15 @@ impl Client {
 
         // Parse it
         let apps: Vec<AppInfo> = serde_json::from_str(&json_data)?;
-        let matching_app = apps.iter().find(|a| a.id == app_id).unwrap();
+        let matching_app = apps.iter().find(|a| a.id == app_id);
 
         // Download if we can
-        if !matching_app.image.is_empty() {
-            let img_url = http_url.to_owned().join(&matching_app.image)?;
+        if let Some(image) = matching_app
+            .map(|a| &a.image)
+            .filter(|i| !i.is_empty())
+            .as_ref()
+        {
+            let img_url = http_url.to_owned().join(image)?;
             log::debug!("{}", img_url);
             let mut img_response = client.get(img_url).send()?.error_for_status()?;
             let mut img_file = std::fs::File::create(img_filepath)?;

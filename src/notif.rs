@@ -19,7 +19,7 @@ pub fn show(msg: &gotify::Message) -> anyhow::Result<()> {
     };
 
     let mut notif = notify_rust::Notification::new();
-    notif.summary(&msg.title).body(&msg.message);
+    notif.summary(&msg.title).body(&msg.text);
     #[cfg(all(unix, not(target_os = "macos")))]
     notif
         .urgency(urgency)
