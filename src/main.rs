@@ -81,13 +81,11 @@ fn main() -> anyhow::Result<()> {
         ),
     };
 
-    // Init client
-    let mut client = gotify::Client::new(&cfg.gotify).context("Failed to setup client")?;
-
     // Connect loop
     loop {
         // Connect
-        client.connect().context("Failed to connect")?;
+        let mut client =
+            gotify::Client::connect(&cfg.gotify).context("Failed to setup or connect client")?;
         log::info!("Connected to {}", cfg.gotify.url);
 
         // Handle missed messages

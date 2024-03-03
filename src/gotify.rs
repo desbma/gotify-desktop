@@ -25,13 +25,10 @@ pub enum NeedsReconnect {
 
 /// Gotify client state
 pub struct Client {
-    /// Local config
-    config: config::GotifyConfig,
-
     /// Websocket client, if connected
-    ws: Option<WebSocket>,
+    ws: WebSocket,
     /// Socket poller
-    poller: Option<mio::Poll>,
+    poller: mio::Poll,
 
     /// HTTP client (non websocket)
     #[allow(clippy::struct_field_names)]
@@ -103,15 +100,15 @@ lazy_static::lazy_static! {
 }
 
 impl Client {
-    /// Constructor
-    pub fn new(config: &config::GotifyConfig) -> anyhow::Result<Client> {
+    /// Get a connected Gotify client
+    pub fn connect(cfg: &config::GotifyConfig) -> anyhow::Result<Self> {
         // Init app img cache
         let app_imgs: HashMap<i64, Option<PathBuf>> = HashMap::new();
         let binary_name = env!("CARGO_PKG_NAME");
         let xdg_dirs = xdg::BaseDirectories::with_prefix(binary_name)?;
 
         // Http client (non WS)
-        let mut gotify_header = reqwest::header::HeaderValue::from_str(&config.token)?;
+        let mut gotify_header = reqwest::header::HeaderValue::from_str(&cfg.token)?;
         gotify_header.set_sensitive(true);
         let mut http_headers = reqwest::header::HeaderMap::new();
         http_headers.insert("X-Gotify-Key", gotify_header);
@@ -119,29 +116,16 @@ impl Client {
             .user_agent(&*USER_AGENT)
             .default_headers(http_headers)
             .build()?;
-        let mut url = config.url.clone();
-        let scheme = match url.scheme() {
+        let mut http_url = cfg.url.clone();
+        let scheme = match http_url.scheme() {
             "wss" => "https",
             "ws" => "http",
             s => anyhow::bail!("Unexpected scheme {:?}", s),
         };
         #[allow(clippy::unwrap_used)] // We know the scheme is valid here
-        url.set_scheme(scheme).unwrap();
+        http_url.set_scheme(scheme).unwrap();
 
-        Ok(Client {
-            config: config.to_owned(),
-            ws: None,
-            poller: None,
-            http_client,
-            http_url: url,
-            app_imgs,
-            xdg_dirs,
-            last_msg_id: None,
-        })
-    }
-
-    /// Connect gotify client, with retries
-    pub fn connect(&mut self) -> anyhow::Result<()> {
+        // Connect gotify client, with retries
         let log_failed_attempt = |err, duration| {
             log::warn!("Connection failed: {}, retrying in {:?}", err, duration);
         };
@@ -154,28 +138,38 @@ impl Client {
             max_elapsed_time: None,
             ..backoff::ExponentialBackoff::default()
         };
-        backoff::retry_notify(
+        let (ws, poller) = backoff::retry_notify(
             retrier,
-            || self.try_connect().map_err(backoff::Error::transient),
+            || Self::try_connect(&cfg.url, &cfg.token).map_err(backoff::Error::transient),
             log_failed_attempt,
         )
         .map_err(|e| match e {
             backoff::Error::Permanent(e) => e,
             backoff::Error::Transient { err, .. } => err,
+        })?;
+
+        Ok(Self {
+            ws,
+            poller,
+            http_client,
+            http_url,
+            app_imgs,
+            xdg_dirs,
+            last_msg_id: None,
         })
     }
 
     /// Connect gotify client
-    fn try_connect(&mut self) -> anyhow::Result<()> {
+    fn try_connect(url: &url::Url, token: &str) -> anyhow::Result<(WebSocket, mio::Poll)> {
         // WS connect & handshake
-        let mut url = self.config.url.clone();
+        let mut url = url.to_owned();
         url.path_segments_mut()
-            .map_err(|()| anyhow::anyhow!("Invalid URL {}", self.config.url))?
+            .map_err(|()| anyhow::anyhow!("Invalid URL"))?
             .push("stream");
         let mut request = url.into_client_request()?;
         let headers = request.headers_mut();
         headers.insert("User-Agent", HeaderValue::from_str(&USER_AGENT)?);
-        headers.insert("X-Gotify-Key", HeaderValue::from_str(&self.config.token)?);
+        headers.insert("X-Gotify-Key", HeaderValue::from_str(token)?);
         let (mut ws, response) = tungstenite::connect(request)?;
 
         // Check response
@@ -203,9 +197,7 @@ impl Client {
             mio::Interest::READABLE,
         )?;
 
-        self.ws = Some(ws);
-        self.poller = Some(poller);
-        Ok(())
+        Ok((ws, poller))
     }
 
     /// Catch up missed messages since the last received one
@@ -247,21 +239,12 @@ impl Client {
 
     /// Get pending gotify messages
     pub fn get_message(&mut self) -> anyhow::Result<Message> {
-        let ws = self
-            .ws
-            .as_mut()
-            .ok_or_else(|| anyhow::anyhow!("Not connected"))?;
-        let poller = self
-            .poller
-            .as_mut()
-            .ok_or_else(|| anyhow::anyhow!("Not connected"))?;
-
         loop {
             // Poll to detect stale socket, so we can trigger reconnect,
             // this can occur when returning from sleep/hibernation
             // Without this, read_message blocks forever even if server already closed its end
             let mut poller_events = mio::Events::with_capacity(1);
-            let poll_res = poller.poll(&mut poller_events, None);
+            let poll_res = self.poller.poll(&mut poller_events, None);
             match poll_res {
                 Err(e) if e.kind() == ErrorKind::Interrupted => {
                     return Err(NeedsReconnect::Io(e).into());
@@ -275,7 +258,7 @@ impl Client {
             log::trace!("Event: {:?}", poller_events);
 
             // Read message
-            let read_res = ws.read();
+            let read_res = self.ws.read();
             let ws_msg = match read_res {
                 Ok(m) => m,
                 Err(tungstenite::Error::Protocol(e))
@@ -291,7 +274,7 @@ impl Client {
             let msg_str = match ws_msg {
                 tungstenite::protocol::Message::Text(msg_str) => msg_str,
                 tungstenite::protocol::Message::Ping(_) => {
-                    ws.flush()?;
+                    self.ws.flush()?;
                     continue;
                 }
                 _ => anyhow::bail!("Unexpected message type: {:?}", ws_msg),
