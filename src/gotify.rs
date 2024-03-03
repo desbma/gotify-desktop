@@ -1,9 +1,9 @@
 //! Gotify network & parsing code
 
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::io::ErrorKind;
 use std::os::unix::io::AsRawFd;
+use std::path::Path;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -234,7 +234,7 @@ impl Client {
         };
 
         for missed_message in &mut missed_messages {
-            self.set_app_img(missed_message)?;
+            self.set_message_app_img(missed_message)?;
         }
 
         if let Some(last_msg) = missed_messages.iter().last() {
@@ -301,7 +301,7 @@ impl Client {
             let mut msg: Message = serde_json::from_str(&msg_str)?;
 
             // Get app image
-            self.set_app_img(&mut msg)?;
+            self.set_message_app_img(&mut msg)?;
 
             self.last_msg_id = Some(msg.id);
             return Ok(msg);
@@ -325,56 +325,49 @@ impl Client {
     }
 
     /// Download (or get from cache) and set app image for a message
-    fn set_app_img(&mut self, msg: &mut Message) -> anyhow::Result<()> {
-        msg.app_img_filepath = match self.app_imgs.entry(msg.appid) {
-            // Cache hit
-            Entry::Occupied(e) => match e.get() {
-                None => None,
-                Some(cache_hit_img_filepath) => {
-                    if cache_hit_img_filepath.is_file() {
-                        // Image file already exists
-                        Some(cache_hit_img_filepath.to_owned())
-                    } else {
-                        log::warn!(
-                            "File {:?} has been removed, will try to download it again",
-                            cache_hit_img_filepath
-                        );
-
-                        // Create cache path
-                        let new_img_filepath = self
-                            .xdg_dirs
-                            .place_cache_file(format!("app-{}.png", msg.appid))?;
-
-                        // Download image file if app has one
-                        Self::download_app_img(
-                            &self.http_url,
-                            &self.http_client,
-                            msg.appid,
-                            &new_img_filepath,
-                        )?
-                    }
-                }
-            },
-            // Cache miss
-            Entry::Vacant(e) => {
-                // Create cache path
-                let img_filepath = self
-                    .xdg_dirs
-                    .place_cache_file(format!("app-{}.png", msg.appid))?;
-
-                let new_entry = if img_filepath.is_file() {
+    fn set_message_app_img(&mut self, msg: &mut Message) -> anyhow::Result<()> {
+        msg.app_img_filepath = match self.app_imgs.get(&msg.appid) {
+            // Cache hit, has file
+            Some(Some(cache_hit_img_filepath)) => {
+                if cache_hit_img_filepath.is_file() {
                     // Image file already exists
-                    Some(img_filepath)
+                    Some(cache_hit_img_filepath.to_owned())
                 } else {
+                    log::warn!(
+                        "File {:?} has been removed, will try to download it again",
+                        cache_hit_img_filepath
+                    );
+
                     // Download image file if app has one
-                    Self::download_app_img(
-                        &self.http_url,
-                        &self.http_client,
-                        msg.appid,
-                        &img_filepath,
-                    )?
+                    self.download_app_img(msg.appid, None, cache_hit_img_filepath)?
+                        .then(|| cache_hit_img_filepath.to_owned())
+                }
+            }
+
+            // Cache hit, has no file
+            Some(None) => None,
+
+            // Cache miss
+            None => {
+                // Create cache path
+                let new_entry = if let Some(image_rel_url) = self.app_img_url(msg.appid)? {
+                    let cache_filename = Path::new(&image_rel_url)
+                        .file_name()
+                        .ok_or_else(|| anyhow::anyhow!("Invalid image URL"))?;
+                    let img_filepath = self.xdg_dirs.place_cache_file(cache_filename)?;
+
+                    if img_filepath.is_file() {
+                        // Image file already exists
+                        Some(img_filepath)
+                    } else {
+                        // Download image file if app has one
+                        self.download_app_img(msg.appid, Some(image_rel_url), &img_filepath)?
+                            .then_some(img_filepath)
+                    }
+                } else {
+                    None
                 };
-                e.insert(new_entry.clone());
+                self.app_imgs.insert(msg.appid, new_entry.clone());
                 new_entry
             }
         };
@@ -382,44 +375,45 @@ impl Client {
         Ok(())
     }
 
-    /// Download Gotify app image
-    fn download_app_img(
-        http_url: &url::Url,
-        client: &reqwest::blocking::Client,
-        app_id: i64,
-        img_filepath: &std::path::Path,
-    ) -> anyhow::Result<Option<PathBuf>> {
+    /// Get app image relative URL from server
+    fn app_img_url(&self, app_id: i64) -> anyhow::Result<Option<String>> {
         // Get app info
-        let mut url = http_url.to_owned();
+        let mut url = self.http_url.clone();
         url.path_segments_mut()
-            .map_err(|()| anyhow::anyhow!("Invalid URL {}", http_url))?
+            .map_err(|()| anyhow::anyhow!("Invalid URL {}", self.http_url))?
             .push("application");
         log::debug!("{}", url);
-        let response = client.get(url).send()?.error_for_status()?;
+        let response = self.http_client.get(url).send()?.error_for_status()?;
         let json_data = response.text()?;
         log::trace!("{}", json_data);
 
         // Parse it
         let apps: Vec<AppInfo> = serde_json::from_str(&json_data)?;
-        let matching_app = apps.iter().find(|a| a.id == app_id);
+        let matching_app = apps.into_iter().find(|a| a.id == app_id);
 
-        // Download if we can
-        let image = if let Some(image) = matching_app
-            .map(|a| &a.image)
-            .filter(|i| !i.is_empty())
-            .as_ref()
-        {
-            let img_url = http_url.to_owned().join(image)?;
+        Ok(matching_app.map(|a| a.image).filter(|i| !i.is_empty()))
+    }
+
+    /// Download Gotify app image if any, return true if we have downloaded one
+    fn download_app_img(
+        &self,
+        app_id: i64,
+        image_rel_url: Option<String>,
+        img_filepath: &std::path::Path,
+    ) -> anyhow::Result<bool> {
+        if let Some(image_rel_url) = image_rel_url.map_or_else(
+            || -> anyhow::Result<_> { self.app_img_url(app_id) },
+            |v| Ok(Some(v)),
+        )? {
+            let img_url = self.http_url.clone().join(&image_rel_url)?;
             log::debug!("{}", img_url);
-            let mut img_response = client.get(img_url).send()?.error_for_status()?;
+            let mut img_response = self.http_client.get(img_url).send()?.error_for_status()?;
             let mut img_file = std::fs::File::create(img_filepath)?;
             std::io::copy(&mut img_response, &mut img_file)?;
             log::debug!("{:?} written", img_filepath);
-            Some(img_filepath.to_owned())
+            Ok(true)
         } else {
-            None
-        };
-
-        Ok(image)
+            Ok(false)
+        }
     }
 }
