@@ -1,11 +1,12 @@
 //! Gotify network & parsing code
 
-use std::collections::HashMap;
-use std::io::ErrorKind;
-use std::os::unix::io::AsRawFd;
-use std::path::Path;
-use std::path::PathBuf;
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    io::ErrorKind,
+    os::unix::io::AsRawFd,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use reqwest::header::HeaderValue;
 use tungstenite::{client::IntoClientRequest, error::ProtocolError};
