@@ -331,7 +331,7 @@ impl Client {
             Entry::Occupied(e) => match e.get() {
                 None => None,
                 Some(cache_hit_img_filepath) => {
-                    if let Ok(_metadata) = std::fs::metadata(cache_hit_img_filepath) {
+                    if cache_hit_img_filepath.is_file() {
                         // Image file already exists
                         Some(cache_hit_img_filepath.to_owned())
                     } else {
@@ -362,8 +362,7 @@ impl Client {
                     .xdg_dirs
                     .place_cache_file(format!("app-{}.png", msg.appid))?;
 
-                let new_entry = if let Ok(_metadata) = std::fs::metadata(&img_filepath) {
-                    // && metadata.is_file()
+                let new_entry = if img_filepath.is_file() {
                     // Image file already exists
                     Some(img_filepath)
                 } else {
@@ -405,7 +404,7 @@ impl Client {
         let matching_app = apps.iter().find(|a| a.id == app_id);
 
         // Download if we can
-        if let Some(image) = matching_app
+        let image = if let Some(image) = matching_app
             .map(|a| &a.image)
             .filter(|i| !i.is_empty())
             .as_ref()
@@ -416,9 +415,11 @@ impl Client {
             let mut img_file = std::fs::File::create(img_filepath)?;
             std::io::copy(&mut img_response, &mut img_file)?;
             log::debug!("{:?} written", img_filepath);
-            Ok(Some(img_filepath.to_owned()))
+            Some(img_filepath.to_owned())
         } else {
-            Ok(None)
-        }
+            None
+        };
+
+        Ok(image)
     }
 }
