@@ -1,6 +1,6 @@
 //! Gotify desktop daemon
 
-use std::process::Command;
+use std::{cell::RefCell, process::Command, rc::Rc};
 
 use anyhow::Context;
 
@@ -81,11 +81,14 @@ fn main() -> anyhow::Result<()> {
         ),
     };
 
+    // Keep last handled message id
+    let last_msg_id = Rc::new(RefCell::new(None));
+
     // Connect loop
     loop {
         // Connect
-        let mut client =
-            gotify::Client::connect(&cfg.gotify).context("Failed to setup or connect client")?;
+        let mut client = gotify::Client::connect(&cfg.gotify, Rc::clone(&last_msg_id))
+            .context("Failed to setup or connect client")?;
         log::info!("Connected to {}", cfg.gotify.url);
 
         // Handle missed messages

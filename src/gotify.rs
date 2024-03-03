@@ -1,10 +1,12 @@
 //! Gotify network & parsing code
 
 use std::{
+    cell::RefCell,
     collections::HashMap,
     io::ErrorKind,
     os::unix::io::AsRawFd,
     path::{Path, PathBuf},
+    rc::Rc,
     time::Duration,
 };
 
@@ -42,7 +44,7 @@ pub struct Client {
     xdg_dirs: xdg::BaseDirectories,
 
     /// Last received Gotify message id
-    last_msg_id: Option<i64>,
+    last_msg_id: Rc<RefCell<Option<i64>>>,
 }
 
 /// Gotify message
@@ -101,7 +103,10 @@ lazy_static::lazy_static! {
 
 impl Client {
     /// Get a connected Gotify client
-    pub fn connect(cfg: &config::GotifyConfig) -> anyhow::Result<Self> {
+    pub fn connect(
+        cfg: &config::GotifyConfig,
+        last_msg_id: Rc<RefCell<Option<i64>>>,
+    ) -> anyhow::Result<Self> {
         // Init app img cache
         let app_imgs: HashMap<i64, Option<PathBuf>> = HashMap::new();
         let binary_name = env!("CARGO_PKG_NAME");
@@ -155,7 +160,7 @@ impl Client {
             http_url,
             app_imgs,
             xdg_dirs,
-            last_msg_id: None,
+            last_msg_id,
         })
     }
 
@@ -202,36 +207,37 @@ impl Client {
 
     /// Catch up missed messages since the last received one
     pub fn get_missed_messages(&mut self) -> anyhow::Result<Vec<Message>> {
-        let mut missed_messages: Vec<Message> = if let Some(last_msg_id) = self.last_msg_id {
-            // Get all recent messages
-            let mut url = self.http_url.clone();
-            url.path_segments_mut()
-                .map_err(|()| anyhow::anyhow!("Invalid URL {}", self.http_url))?
-                .push("message");
-            url.query_pairs_mut().append_pair("limit", "200");
-            log::debug!("{}", url);
-            let response = self.http_client.get(url).send()?.error_for_status()?;
-            let json_data = response.text()?;
-            log::trace!("{}", json_data);
+        let mut missed_messages: Vec<Message> =
+            if let Some(last_msg_id) = *self.last_msg_id.borrow() {
+                // Get all recent messages
+                let mut url = self.http_url.clone();
+                url.path_segments_mut()
+                    .map_err(|()| anyhow::anyhow!("Invalid URL {}", self.http_url))?
+                    .push("message");
+                url.query_pairs_mut().append_pair("limit", "200");
+                log::debug!("{}", url);
+                let response = self.http_client.get(url).send()?.error_for_status()?;
+                let json_data = response.text()?;
+                log::trace!("{}", json_data);
 
-            // Parse response & keep the ones we have not yet seen
-            let all_messages: AllMessages = serde_json::from_str(&json_data)?;
-            all_messages
-                .messages
-                .into_iter()
-                .filter(|m| m.id > last_msg_id)
-                .rev()
-                .collect()
-        } else {
-            vec![]
-        };
+                // Parse response & keep the ones we have not yet seen
+                let all_messages: AllMessages = serde_json::from_str(&json_data)?;
+                all_messages
+                    .messages
+                    .into_iter()
+                    .filter(|m| m.id > last_msg_id)
+                    .rev()
+                    .collect()
+            } else {
+                vec![]
+            };
 
         for missed_message in &mut missed_messages {
             self.set_message_app_img(missed_message)?;
         }
 
         if let Some(last_msg) = missed_messages.iter().last() {
-            self.last_msg_id = Some(last_msg.id);
+            self.last_msg_id.replace(Some(last_msg.id));
         }
 
         Ok(missed_messages)
@@ -287,7 +293,7 @@ impl Client {
             // Get app image
             self.set_message_app_img(&mut msg)?;
 
-            self.last_msg_id = Some(msg.id);
+            self.last_msg_id.replace(Some(msg.id));
             return Ok(msg);
         }
     }
