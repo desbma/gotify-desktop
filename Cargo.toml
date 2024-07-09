@@ -23,7 +23,7 @@ shlex = { version = "1.2.0", default-features = false, features = ["std"] }
 simple_logger = { version = "4.2.0", default-features = false, features = ["colors", "timestamps", "stderr"] }
 thiserror = { version = "1.0.50", default-features = false }
 toml = { version = "0.8.6", default-features = false, features = ["parse"] }
-tungstenite = { version = "0.20.1", default-features = false, features = ["native-tls", "handshake"] }
+tungstenite = { version = "0.23.0", default-features = false, features = ["native-tls", "handshake", "url"] }
 url = { version = "2.4.1", default-features = false, features = ["serde"] }
 xdg = { version = "2.5.2", default-features = false }
 

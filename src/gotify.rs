@@ -10,8 +10,7 @@ use std::{
     time::Duration,
 };
 
-use reqwest::header::HeaderValue;
-use tungstenite::{client::IntoClientRequest, error::ProtocolError};
+use tungstenite::{client::IntoClientRequest, error::ProtocolError, http::HeaderValue};
 
 use crate::config;
 
