@@ -14,9 +14,9 @@ anyhow = { version = "1.0.75", default-features = false, features = ["std", "bac
 backoff = { version = "0.4.0", default-features = false }
 lazy_static = { version = "1.4", default-features = false }
 log = { version = "0.4.20", default-features = false, features = ["max_level_trace", "release_max_level_info"] }
-mio = { version = "0.8.9", default-features = false, features = ["os-ext"] }
+mio = { version = "0.8.11", default-features = false, features = ["os-ext"] }
 notify-rust = { version = "4.9.0", default-features = false, features = ["serde", "zbus"] }
-reqwest = { version = "0.11.22", default-features = false, features = ["native-tls", "blocking", "gzip"] }
+reqwest = { version = "0.12.5", default-features = false, features = ["native-tls", "blocking", "gzip"] }
 serde = { version = "1.0.190", default-features = false, features = ["std"] }
 serde_json = { version = "1.0.107", default-features = false, features = ["std"] }
 shlex = { version = "1.2.0", default-features = false, features = ["std"] }
