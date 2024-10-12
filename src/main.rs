@@ -20,7 +20,7 @@ fn run_on_msg_command(
     );
     Command::new(&on_msg_command.0)
         .args(&on_msg_command.1)
-        .env("GOTIFY_MSG_PRIORITY", &format!("{}", message.priority))
+        .env("GOTIFY_MSG_PRIORITY", format!("{}", message.priority))
         .env("GOTIFY_MSG_TITLE", &message.title)
         .env("GOTIFY_MSG_TEXT", &message.text)
         .status()?;
