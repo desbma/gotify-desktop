@@ -2,15 +2,17 @@
 
 set -o pipefail
 
-readonly VERSION=${1:?}
-
+readonly VERSION="${1:?}"
 
 cd "$(git rev-parse --show-toplevel)"
 
-sed -i "s/^\(version = \"\).*\(\"\)/\1$VERSION\2/w /dev/stdout" Cargo.toml
+cargo set-version "${VERSION}"
 
+cargo upgrade
 cargo update
-cargo check && cargo test
+
+cargo check
+cargo test
 
 git add Cargo.{toml,lock}
 
