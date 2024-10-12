@@ -7,6 +7,7 @@ use std::{
     os::unix::io::AsRawFd,
     path::{Path, PathBuf},
     rc::Rc,
+    sync::LazyLock,
     time::Duration,
 };
 
@@ -95,10 +96,9 @@ struct AppInfo {
 /// HTTP or HTTPS websocket
 type WebSocket = tungstenite::WebSocket<tungstenite::stream::MaybeTlsStream<std::net::TcpStream>>;
 
-lazy_static::lazy_static! {
-    static ref USER_AGENT: String =
-        format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
-}
+/// HTTP User-Agent string
+static USER_AGENT: LazyLock<String> =
+    LazyLock::new(|| format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")));
 
 impl Client {
     /// Get a connected Gotify client
