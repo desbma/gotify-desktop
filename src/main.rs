@@ -74,7 +74,7 @@ fn main() -> anyhow::Result<()> {
         None => None,
         Some(cmd) => Some(
             shlex::split(&cmd)
-                .context(format!("Failed to split command arguments for {cmd:?}"))?
+                .with_context(|| format!("Failed to split command arguments for {cmd:?}"))?
                 .split_first()
                 .map(|t| (t.0.to_owned(), t.1.to_owned()))
                 .ok_or_else(|| anyhow::anyhow!("Empty command"))?,
