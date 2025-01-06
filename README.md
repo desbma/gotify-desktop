@@ -49,12 +49,21 @@ Edit `~/.config/gotify-desktop/config.toml` with your server URL and client toke
 
 ```
 [gotify]
+# gotify server websocket URL, use wss:// prefix for TLS, or ws:// for unencrypted
 url = "wss://SERVER_DOMAIN:SERVER_PORT"
+
+# secret gotify token
 token = "YOUR_SECRET_TOKEN"
-auto_delete = true  # optional, if true, deletes messages that have been handled, defaults to false
+# if you want to get the token from a password manager, or other external command,
+# you can also use for example:
+# token = { "command": "secret-tool lookup Title 'Gotify token'" }
+
+# optional, if true, deletes messages that have been handled, defaults to false
+auto_delete = true
 
 [notification]
-min_priority = 1  # optional, ignores messages with priority lower than given value
+# optional, ignores messages with priority lower than given value, defaults to 0
+min_priority = 1
 
 [action]
 # optional, run the given command for each message, with the following environment variables set: GOTIFY_MSG_PRIORITY, GOTIFY_MSG_TITLE and GOTIFY_MSG_TEXT.

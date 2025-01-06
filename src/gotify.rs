@@ -104,6 +104,7 @@ impl Client {
     /// Get a connected Gotify client
     pub(crate) fn connect(
         cfg: &config::GotifyConfig,
+        token: &str,
         last_msg_id: Rc<RefCell<Option<i64>>>,
     ) -> anyhow::Result<Self> {
         // Init app img cache
@@ -112,7 +113,7 @@ impl Client {
         let xdg_dirs = xdg::BaseDirectories::with_prefix(binary_name)?;
 
         // Http client (non WS)
-        let mut gotify_header = HeaderValue::from_str(&cfg.token)?;
+        let mut gotify_header = HeaderValue::from_str(token)?;
         gotify_header.set_sensitive(true);
         let mut http_headers = reqwest::header::HeaderMap::new();
         http_headers.insert("X-Gotify-Key", gotify_header);
@@ -144,7 +145,7 @@ impl Client {
         };
         let (ws, poller) = backoff::retry_notify(
             retrier,
-            || Self::try_connect(&cfg.url, &cfg.token).map_err(backoff::Error::transient),
+            || Self::try_connect(&cfg.url, token).map_err(backoff::Error::transient),
             log_failed_attempt,
         )
         .map_err(|e| match e {

@@ -70,6 +70,7 @@ fn main() -> anyhow::Result<()> {
 
     // Parse config
     let cfg = config::parse().context("Failed to read config")?;
+    let token = cfg.gotify.token.fetch()?;
     let on_msg_command = match cfg.action.on_msg_command {
         None => None,
         Some(cmd) => Some(
@@ -87,7 +88,7 @@ fn main() -> anyhow::Result<()> {
     // Connect loop
     loop {
         // Connect
-        let mut client = gotify::Client::connect(&cfg.gotify, Rc::clone(&last_msg_id))
+        let mut client = gotify::Client::connect(&cfg.gotify, &token, Rc::clone(&last_msg_id))
             .context("Failed to setup or connect client")?;
         log::info!("Connected to {}", cfg.gotify.url);
 
