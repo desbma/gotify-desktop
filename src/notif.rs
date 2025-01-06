@@ -6,7 +6,7 @@ use crate::gotify;
 const DESKTOP_ENTRY_NAME: &str = env!("CARGO_PKG_NAME");
 
 /// Show notification
-pub fn show(msg: &gotify::Message) -> anyhow::Result<()> {
+pub(crate) fn show(msg: &gotify::Message) -> anyhow::Result<()> {
     #[cfg(all(unix, not(target_os = "macos")))]
     let urgency = match msg.priority {
         0..=3 => notify_rust::Urgency::Low,

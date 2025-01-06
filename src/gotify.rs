@@ -4,21 +4,21 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     io::ErrorKind,
-    os::unix::io::AsRawFd,
+    os::unix::io::AsRawFd as _,
     path::{Path, PathBuf},
     rc::Rc,
     sync::LazyLock,
     time::Duration,
 };
 
-use tungstenite::{client::IntoClientRequest, error::ProtocolError, http::HeaderValue};
+use tungstenite::{client::IntoClientRequest as _, error::ProtocolError, http::HeaderValue};
 
 use crate::config;
 
 /// Error when socket needs reconnect
 #[derive(thiserror::Error, Debug)]
 #[error(transparent)]
-pub enum NeedsReconnect {
+pub(crate) enum NeedsReconnect {
     /// Inner poll error
     Io(#[from] std::io::Error),
     /// Protocol disconnect
@@ -26,14 +26,14 @@ pub enum NeedsReconnect {
 }
 
 /// Gotify client state
-pub struct Client {
+pub(crate) struct Client {
     /// Websocket client, if connected
     ws: WebSocket,
     /// Socket poller
     poller: mio::Poll,
 
     /// HTTP client (non websocket)
-    #[allow(clippy::struct_field_names)]
+    #[expect(clippy::struct_field_names)]
     http_client: reqwest::blocking::Client,
     /// Gotify HTTP(S) URL
     http_url: url::Url,
@@ -49,7 +49,7 @@ pub struct Client {
 
 /// Gotify message
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct Message {
+pub(crate) struct Message {
     /// Gotify id
     pub id: i64,
     /// App id
@@ -71,7 +71,7 @@ pub struct Message {
 
 /// Gotify message bunch
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct AllMessages {
+pub(crate) struct AllMessages {
     /// The actual messages
     messages: Vec<Message>,
 }
@@ -102,7 +102,7 @@ static USER_AGENT: LazyLock<String> =
 
 impl Client {
     /// Get a connected Gotify client
-    pub fn connect(
+    pub(crate) fn connect(
         cfg: &config::GotifyConfig,
         last_msg_id: Rc<RefCell<Option<i64>>>,
     ) -> anyhow::Result<Self> {
@@ -112,7 +112,7 @@ impl Client {
         let xdg_dirs = xdg::BaseDirectories::with_prefix(binary_name)?;
 
         // Http client (non WS)
-        let mut gotify_header = reqwest::header::HeaderValue::from_str(&cfg.token)?;
+        let mut gotify_header = HeaderValue::from_str(&cfg.token)?;
         gotify_header.set_sensitive(true);
         let mut http_headers = reqwest::header::HeaderMap::new();
         http_headers.insert("X-Gotify-Key", gotify_header);
@@ -126,7 +126,7 @@ impl Client {
             "ws" => "http",
             s => anyhow::bail!("Unexpected scheme {:?}", s),
         };
-        #[allow(clippy::unwrap_used)] // We know the scheme is valid here
+        #[expect(clippy::unwrap_used)] // We know the scheme is valid here
         http_url.set_scheme(scheme).unwrap();
 
         // Connect gotify client, with retries
@@ -205,7 +205,7 @@ impl Client {
     }
 
     /// Catch up missed messages since the last received one
-    pub fn get_missed_messages(&mut self) -> anyhow::Result<Vec<Message>> {
+    pub(crate) fn get_missed_messages(&mut self) -> anyhow::Result<Vec<Message>> {
         let mut missed_messages: Vec<Message> =
             if let Some(last_msg_id) = *self.last_msg_id.borrow() {
                 // Get all recent messages
@@ -243,7 +243,7 @@ impl Client {
     }
 
     /// Get pending gotify messages
-    pub fn get_message(&mut self) -> anyhow::Result<Message> {
+    pub(crate) fn get_message(&mut self) -> anyhow::Result<Message> {
         loop {
             // Poll to detect stale socket, so we can trigger reconnect,
             // this can occur when returning from sleep/hibernation
@@ -298,7 +298,7 @@ impl Client {
     }
 
     /// Delete gotify message
-    pub fn delete_message(&mut self, msg_id: i64) -> anyhow::Result<()> {
+    pub(crate) fn delete_message(&mut self, msg_id: i64) -> anyhow::Result<()> {
         let mut url = self.http_url.clone();
         url.path_segments_mut()
             .map_err(|()| anyhow::anyhow!("Invalid URL {}", self.http_url))?
@@ -388,7 +388,7 @@ impl Client {
         &self,
         app_id: i64,
         image_rel_url: Option<String>,
-        img_filepath: &std::path::Path,
+        img_filepath: &Path,
     ) -> anyhow::Result<bool> {
         if let Some(image_rel_url) = image_rel_url.map_or_else(
             || -> anyhow::Result<_> { self.app_img_url(app_id) },

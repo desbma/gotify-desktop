@@ -2,7 +2,7 @@
 
 use std::{cell::RefCell, process::Command, rc::Rc};
 
-use anyhow::Context;
+use anyhow::Context as _;
 
 mod config;
 mod gotify;
@@ -114,6 +114,7 @@ fn main() -> anyhow::Result<()> {
             let res = client.get_message();
             let msg = match res {
                 Ok(m) => m,
+                #[expect(clippy::ref_patterns)]
                 Err(ref e) => {
                     if e.downcast_ref::<gotify::NeedsReconnect>().is_some() {
                         log::warn!("Error while waiting for message: {e}, will try to reconnect");
