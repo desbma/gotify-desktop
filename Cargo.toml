@@ -1,6 +1,6 @@
 [package]
 name = "gotify-desktop"
-version = "1.3.7"
+version = "1.4.0"
 authors = ["desbma <desbma@users.noreply.github.com>"]
 rust-version = "1.81"
 edition = "2021"
@@ -11,20 +11,20 @@ codegen-units = 1
 strip = true
 
 [dependencies]
-anyhow = { version = "1.0.75", default-features = false, features = ["std", "backtrace"] }
+anyhow = { version = "1.0.95", default-features = false, features = ["std", "backtrace"] }
 backoff = { version = "0.4.0", default-features = false }
-log = { version = "0.4.20", default-features = false, features = ["max_level_trace", "release_max_level_info"] }
-mio = { version = "0.8.11", default-features = false, features = ["os-ext"] }
-notify-rust = { version = "4.9.0", default-features = false, features = ["serde", "zbus"] }
-reqwest = { version = "0.12.5", default-features = false, features = ["native-tls", "blocking", "gzip"] }
-serde = { version = "1.0.190", default-features = false, features = ["std"] }
-serde_json = { version = "1.0.107", default-features = false, features = ["std"] }
-shlex = { version = "1.2.0", default-features = false, features = ["std"] }
-simple_logger = { version = "4.2.0", default-features = false, features = ["colors", "timestamps", "stderr"] }
-thiserror = { version = "1.0.50", default-features = false }
-toml = { version = "0.8.6", default-features = false, features = ["parse"] }
-tungstenite = { version = "0.23.0", default-features = false, features = ["native-tls", "handshake", "url"] }
-url = { version = "2.4.1", default-features = false, features = ["serde"] }
+log = { version = "0.4.22", default-features = false, features = ["max_level_trace", "release_max_level_info"] }
+mio = { version = "1.0.3", default-features = false, features = ["os-ext"] }
+notify-rust = { version = "4.11.3", default-features = false, features = ["serde", "zbus"] }
+reqwest = { version = "0.12.12", default-features = false, features = ["native-tls", "blocking", "gzip"] }
+serde = { version = "1.0.217", default-features = false, features = ["std"] }
+serde_json = { version = "1.0.135", default-features = false, features = ["std"] }
+shlex = { version = "1.3.0", default-features = false, features = ["std"] }
+simple_logger = { version = "5.0.0", default-features = false, features = ["colors", "timestamps", "stderr"] }
+thiserror = { version = "2.0.9", default-features = false }
+toml = { version = "0.8.19", default-features = false, features = ["parse"] }
+tungstenite = { version = "0.26.1", default-features = false, features = ["native-tls", "handshake", "url"] }
+url = { version = "2.5.4", default-features = false, features = ["serde"] }
 xdg = { version = "2.5.2", default-features = false }
 
 [lints.rust]
