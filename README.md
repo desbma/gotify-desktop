@@ -56,7 +56,7 @@ url = "wss://SERVER_DOMAIN:SERVER_PORT"
 token = "YOUR_SECRET_TOKEN"
 # if you want to get the token from a password manager, or other external command,
 # you can also use for example:
-# token = { "command": "secret-tool lookup Title 'Gotify token'" }
+# token = { command = "secret-tool lookup Title 'Gotify token'" }
 
 # optional, if true, deletes messages that have been handled, defaults to false
 auto_delete = true
