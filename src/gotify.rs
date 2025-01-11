@@ -157,9 +157,11 @@ impl Client {
         })
     }
 
-    /// Add auth header to request, send it, check status code, and return response
-    fn send_request(&self, req: ureq::Request) -> anyhow::Result<Vec<u8>> {
-        let response = req.set("X-Gotify-Key", &self.token).call()?;
+    /// Build request with auth header, send it, check status code, and return response
+    fn send_request(&self, method: &'static str, url: &url::Url) -> anyhow::Result<Vec<u8>> {
+        log::debug!("{method} {url}");
+        let request = self.http_client.request_url(method, url);
+        let response = request.set("X-Gotify-Key", &self.token).call()?;
         anyhow::ensure!(
             response.status() >= 200 && response.status() < 300,
             "HTTP response {}: {}",
@@ -181,9 +183,10 @@ impl Client {
     /// Add auth header to request, send it, check status code, and parse JSON response
     fn send_api_request<T: serde::de::DeserializeOwned>(
         &self,
-        req: ureq::Request,
+        method: &'static str,
+        url: &url::Url,
     ) -> anyhow::Result<T> {
-        let json_data = String::from_utf8(self.send_request(req)?)?;
+        let json_data = String::from_utf8(self.send_request(method, url)?)?;
         log::trace!("{}", json_data);
         Ok(serde_json::from_str(&json_data)?)
     }
@@ -239,9 +242,7 @@ impl Client {
                     .map_err(|()| anyhow::anyhow!("Invalid URL {}", self.http_url))?
                     .push("message");
                 url.query_pairs_mut().append_pair("limit", "200");
-                log::debug!("{}", url);
-                let req = self.http_client.get(url.as_str());
-                let all_messages: AllMessages = self.send_api_request(req)?;
+                let all_messages: AllMessages = self.send_api_request("GET", &url)?;
 
                 // Keep the ones we have not yet seen
                 all_messages
@@ -327,11 +328,7 @@ impl Client {
             .map_err(|()| anyhow::anyhow!("Invalid URL {}", self.http_url))?
             .push("message")
             .push(&format!("{msg_id}"));
-        log::debug!("{}", url);
-
-        let req = self.http_client.delete(url.as_str());
-        let _ = self.send_request(req)?;
-
+        let _ = self.send_request("DELETE", &url)?;
         Ok(())
     }
 
@@ -393,9 +390,7 @@ impl Client {
         url.path_segments_mut()
             .map_err(|()| anyhow::anyhow!("Invalid URL {}", self.http_url))?
             .push("application");
-        log::debug!("{}", url);
-        let req = self.http_client.get(url.as_str());
-        let apps: Vec<AppInfo> = self.send_api_request(req)?;
+        let apps: Vec<AppInfo> = self.send_api_request("GET", &url)?;
 
         // Parse it
         let matching_app = apps.into_iter().find(|a| a.id == app_id);
@@ -415,9 +410,7 @@ impl Client {
             |v| Ok(Some(v)),
         )? {
             let img_url = self.http_url.clone().join(&image_rel_url)?;
-            log::debug!("{}", img_url);
-            let req = self.http_client.get(img_url.as_str());
-            let img_data = self.send_request(req)?;
+            let img_data = self.send_request("GET", &img_url)?;
             let mut img_file = File::create(img_filepath)?;
             img_file.write_all(&img_data)?;
             log::debug!("{:?} written", img_filepath);
