@@ -3,11 +3,12 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
-    io::ErrorKind,
+    fs::File,
+    io::{ErrorKind, Write as _},
     os::unix::io::AsRawFd as _,
     path::{Path, PathBuf},
     rc::Rc,
-    sync::LazyLock,
+    sync::{Arc, LazyLock},
     time::Duration,
 };
 
@@ -31,18 +32,17 @@ pub(crate) struct Client {
     ws: WebSocket,
     /// Socket poller
     poller: mio::Poll,
-
+    /// Gotify API token
+    token: String,
     /// HTTP client (non websocket)
     #[expect(clippy::struct_field_names)]
-    http_client: reqwest::blocking::Client,
+    http_client: ureq::Agent,
     /// Gotify HTTP(S) URL
     http_url: url::Url,
-
     /// App image cache
     app_imgs: HashMap<i64, Option<PathBuf>>,
     /// XDG dirs
     xdg_dirs: xdg::BaseDirectories,
-
     /// Last received Gotify message id
     last_msg_id: Rc<RefCell<Option<i64>>>,
 }
@@ -63,7 +63,6 @@ pub(crate) struct Message {
     pub priority: i64,
     /// Message date & time
     pub date: String,
-
     /// App image filepath
     #[serde(skip)]
     pub app_img_filepath: Option<PathBuf>,
@@ -112,15 +111,11 @@ impl Client {
         let binary_name = env!("CARGO_PKG_NAME");
         let xdg_dirs = xdg::BaseDirectories::with_prefix(binary_name)?;
 
-        // Http client (non WS)
-        let mut gotify_header = HeaderValue::from_str(token)?;
-        gotify_header.set_sensitive(true);
-        let mut http_headers = reqwest::header::HeaderMap::new();
-        http_headers.insert("X-Gotify-Key", gotify_header);
-        let http_client = reqwest::blocking::Client::builder()
-            .user_agent(&*USER_AGENT)
-            .default_headers(http_headers)
-            .build()?;
+        // HTTP client (non WS)
+        let http_client = ureq::AgentBuilder::new()
+            .tls_connector(Arc::new(ureq::native_tls::TlsConnector::new()?))
+            .user_agent(&USER_AGENT)
+            .build();
         let mut http_url = cfg.url.clone();
         let scheme = match http_url.scheme() {
             "wss" => "https",
@@ -156,12 +151,47 @@ impl Client {
         Ok(Self {
             ws,
             poller,
+            token: token.to_owned(),
             http_client,
             http_url,
             app_imgs,
             xdg_dirs,
             last_msg_id,
         })
+    }
+
+    /// Build request with auth header, send it, check status code, and return response
+    fn send_request(&self, method: &'static str, url: &url::Url) -> anyhow::Result<Vec<u8>> {
+        log::debug!("{method} {url}");
+        let request = self.http_client.request_url(method, url);
+        let response = request.set("X-Gotify-Key", &self.token).call()?;
+        anyhow::ensure!(
+            response.status() >= 200 && response.status() < 300,
+            "HTTP response {}: {}",
+            response.status(),
+            response.status_text()
+        );
+        let mut buf = if let Some(content_len) = response
+            .header("Content-Length")
+            .and_then(|h| h.parse::<usize>().ok())
+        {
+            Vec::with_capacity(content_len)
+        } else {
+            Vec::new()
+        };
+        response.into_reader().read_to_end(&mut buf)?;
+        Ok(buf)
+    }
+
+    /// Add auth header to request, send it, check status code, and parse JSON response
+    fn send_api_request<T: serde::de::DeserializeOwned>(
+        &self,
+        method: &'static str,
+        url: &url::Url,
+    ) -> anyhow::Result<T> {
+        let json_data = String::from_utf8(self.send_request(method, url)?)?;
+        log::trace!("{}", json_data);
+        Ok(serde_json::from_str(&json_data)?)
     }
 
     /// Connect gotify client
@@ -215,13 +245,9 @@ impl Client {
                     .map_err(|()| anyhow::anyhow!("Invalid URL {}", self.http_url))?
                     .push("message");
                 url.query_pairs_mut().append_pair("limit", "200");
-                log::debug!("{}", url);
-                let response = self.http_client.get(url).send()?.error_for_status()?;
-                let json_data = response.text()?;
-                log::trace!("{}", json_data);
+                let all_messages: AllMessages = self.send_api_request("GET", &url)?;
 
-                // Parse response & keep the ones we have not yet seen
-                let all_messages: AllMessages = serde_json::from_str(&json_data)?;
+                // Keep the ones we have not yet seen
                 all_messages
                     .messages
                     .into_iter()
@@ -305,12 +331,7 @@ impl Client {
             .map_err(|()| anyhow::anyhow!("Invalid URL {}", self.http_url))?
             .push("message")
             .push(&format!("{msg_id}"));
-        log::debug!("{}", url);
-
-        let response = self.http_client.delete(url).send()?.error_for_status()?;
-        let json_data = response.text()?;
-        log::trace!("{}", json_data);
-
+        let _ = self.send_request("DELETE", &url)?;
         Ok(())
     }
 
@@ -372,13 +393,9 @@ impl Client {
         url.path_segments_mut()
             .map_err(|()| anyhow::anyhow!("Invalid URL {}", self.http_url))?
             .push("application");
-        log::debug!("{}", url);
-        let response = self.http_client.get(url).send()?.error_for_status()?;
-        let json_data = response.text()?;
-        log::trace!("{}", json_data);
+        let apps: Vec<AppInfo> = self.send_api_request("GET", &url)?;
 
         // Parse it
-        let apps: Vec<AppInfo> = serde_json::from_str(&json_data)?;
         let matching_app = apps.into_iter().find(|a| a.id == app_id);
 
         Ok(matching_app.map(|a| a.image).filter(|i| !i.is_empty()))
@@ -396,10 +413,9 @@ impl Client {
             |v| Ok(Some(v)),
         )? {
             let img_url = self.http_url.clone().join(&image_rel_url)?;
-            log::debug!("{}", img_url);
-            let mut img_response = self.http_client.get(img_url).send()?.error_for_status()?;
-            let mut img_file = std::fs::File::create(img_filepath)?;
-            std::io::copy(&mut img_response, &mut img_file)?;
+            let img_data = self.send_request("GET", &img_url)?;
+            let mut img_file = File::create(img_filepath)?;
+            img_file.write_all(&img_data)?;
             log::debug!("{:?} written", img_filepath);
             Ok(true)
         } else {

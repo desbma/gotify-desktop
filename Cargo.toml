@@ -16,7 +16,6 @@ backoff = { version = "0.4.0", default-features = false }
 log = { version = "0.4.22", default-features = false, features = ["max_level_trace", "release_max_level_info"] }
 mio = { version = "1.0.3", default-features = false, features = ["os-ext"] }
 notify-rust = { version = "4.11.3", default-features = false, features = ["serde", "zbus"] }
-reqwest = { version = "0.12.12", default-features = false, features = ["native-tls", "blocking", "gzip"] }
 serde = { version = "1.0.217", default-features = false, features = ["std"] }
 serde_json = { version = "1.0.135", default-features = false, features = ["std"] }
 shlex = { version = "1.3.0", default-features = false, features = ["std"] }
@@ -24,6 +23,7 @@ simple_logger = { version = "5.0.0", default-features = false, features = ["colo
 thiserror = { version = "2.0.9", default-features = false }
 toml = { version = "0.8.19", default-features = false, features = ["parse"] }
 tungstenite = { version = "0.26.1", default-features = false, features = ["native-tls", "handshake", "url"] }
+ureq = { version = "2.12.1", default-features = false, features = ["gzip", "native-tls"] }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
 xdg = { version = "2.5.2", default-features = false }
 
