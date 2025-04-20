@@ -1,6 +1,6 @@
 [package]
 name = "gotify-desktop"
-version = "1.4.0"
+version = "1.4.1"
 authors = ["desbma <desbma@users.noreply.github.com>"]
 rust-version = "1.86"
 edition = "2024"
