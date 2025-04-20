@@ -37,7 +37,7 @@ fn handle_message(
     delete: bool,
     client: &mut gotify::Client,
 ) -> anyhow::Result<()> {
-    log::info!("Got {:?}", message);
+    log::info!("Got {message:?}");
 
     if message.priority >= min_priority {
         notif::show(message)?;
@@ -50,7 +50,7 @@ fn handle_message(
 
     if let Some(on_msg_command) = on_msg_command {
         if let Err(e) = run_on_msg_command(message, on_msg_command) {
-            log::warn!("Command {:?} failed with error: {:?}", on_msg_command, e);
+            log::warn!("Command {on_msg_command:?} failed with error: {e:?}");
         }
     }
 

@@ -127,7 +127,7 @@ impl Client {
 
         // Connect gotify client, with retries
         let log_failed_attempt = |err, duration| {
-            log::warn!("Connection failed: {}, retrying in {:?}", err, duration);
+            log::warn!("Connection failed: {err}, retrying in {duration:?}");
         };
         let retrier = backoff::ExponentialBackoff {
             current_interval: Duration::from_millis(250),
@@ -190,7 +190,7 @@ impl Client {
         url: &url::Url,
     ) -> anyhow::Result<T> {
         let json_data = String::from_utf8(self.send_request(method, url)?)?;
-        log::trace!("{}", json_data);
+        log::trace!("{json_data}");
         Ok(serde_json::from_str(&json_data)?)
     }
 
@@ -287,7 +287,7 @@ impl Client {
             if poller_events.is_empty() {
                 continue;
             }
-            log::trace!("Event: {:?}", poller_events);
+            log::trace!("Event: {poller_events:?}");
 
             // Read message
             let read_res = self.ws.read();
@@ -300,7 +300,7 @@ impl Client {
                 }
                 Err(_) => read_res?,
             };
-            log::trace!("Got message: {:?}", ws_msg);
+            log::trace!("Got message: {ws_msg:?}");
 
             // Check message type
             let msg_str = match ws_msg {
@@ -313,7 +313,7 @@ impl Client {
             };
 
             // Parse
-            log::trace!("{}", msg_str);
+            log::trace!("{msg_str}");
             let mut msg: Message = serde_json::from_str(&msg_str)?;
 
             // Get app image
@@ -345,8 +345,7 @@ impl Client {
                     Some(cache_hit_img_filepath.to_owned())
                 } else {
                     log::warn!(
-                        "File {:?} has been removed, will try to download it again",
-                        cache_hit_img_filepath
+                        "File {cache_hit_img_filepath:?} has been removed, will try to download it again"
                     );
 
                     // Download image file if app has one
@@ -416,7 +415,7 @@ impl Client {
             let img_data = self.send_request("GET", &img_url)?;
             let mut img_file = File::create(img_filepath)?;
             img_file.write_all(&img_data)?;
-            log::debug!("{:?} written", img_filepath);
+            log::debug!("{img_filepath:?} written");
             Ok(true)
         } else {
             Ok(false)

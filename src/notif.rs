@@ -13,7 +13,7 @@ pub(crate) fn show(msg: &gotify::Message) -> anyhow::Result<()> {
         4..=7 => notify_rust::Urgency::Normal,
         8..=10 => notify_rust::Urgency::Critical,
         v => {
-            log::warn!("Unexpected urgency value {}", v);
+            log::warn!("Unexpected urgency value {v}");
             notify_rust::Urgency::Normal
         }
     };
