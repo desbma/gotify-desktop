@@ -39,6 +39,12 @@ sudo install -Dm 644 /tmp/gotify-logo-small.svg /usr/share/icons/hicolor/scalabl
 sudo gtk-update-icon-cache /usr/share/icons/hicolor/
 ```
 
+And to install the systemd service:
+
+```
+sudo install -Dm 644 -t /usr/lib/systemd/user/ gotify-desktop.service
+```
+
 ### From AUR
 
 Arch Linux users can install the [gotify-desktop AUR package](https://aur.archlinux.org/packages/gotify-desktop/).
