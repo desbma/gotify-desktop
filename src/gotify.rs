@@ -12,6 +12,7 @@ use std::{
     time::Duration,
 };
 
+use backon::BlockingRetryable as _;
 use tungstenite::{client::IntoClientRequest as _, error::ProtocolError, http::HeaderValue};
 
 use crate::config;
@@ -126,27 +127,18 @@ impl Client {
         http_url.set_scheme(scheme).unwrap();
 
         // Connect gotify client, with retries
-        let log_failed_attempt = |err, duration| {
-            log::warn!("Connection failed: {err}, retrying in {duration:?}");
-        };
-        let retrier = backoff::ExponentialBackoff {
-            current_interval: Duration::from_millis(250),
-            initial_interval: Duration::from_millis(250),
-            randomization_factor: 0.0,
-            multiplier: 1.5,
-            max_interval: Duration::from_secs(60),
-            max_elapsed_time: None,
-            ..backoff::ExponentialBackoff::default()
-        };
-        let (ws, poller) = backoff::retry_notify(
-            retrier,
-            || Self::try_connect(&cfg.url, token).map_err(backoff::Error::transient),
-            log_failed_attempt,
-        )
-        .map_err(|e| match e {
-            backoff::Error::Permanent(e) => e,
-            backoff::Error::Transient { err, .. } => err,
-        })?;
+        let (ws, poller) = (|| Self::try_connect(&cfg.url, token))
+            .retry(
+                backon::ExponentialBuilder::default()
+                    .with_factor(1.5)
+                    .with_min_delay(Duration::from_millis(250))
+                    .with_max_delay(Duration::from_secs(60))
+                    .without_max_times(),
+            )
+            .notify(|err, dur| {
+                log::warn!("Connection failed: {err}, retrying in {dur:?}");
+            })
+            .call()?;
 
         Ok(Self {
             ws,

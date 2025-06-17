@@ -12,7 +12,7 @@ strip = true
 
 [dependencies]
 anyhow = { version = "1.0.98", default-features = false, features = ["std", "backtrace"] }
-backoff = { version = "0.4.0", default-features = false }
+backon = { version = "1.5.1", default-features = false, features = ["std", "std-blocking-sleep"] }
 log = { version = "0.4.27", default-features = false, features = ["max_level_trace", "release_max_level_info"] }
 mio = { version = "1.0.3", default-features = false, features = ["os-ext"] }
 notify-rust = { version = "4.11.7", default-features = false, features = ["serde", "zbus"] }
