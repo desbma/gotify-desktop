@@ -403,7 +403,17 @@ impl Client {
             || -> anyhow::Result<_> { self.app_img_url(app_id) },
             |v| Ok(Some(v)),
         )? {
-            let img_url = self.http_url.clone().join(&image_rel_url)?;
+            let mut img_url = self.http_url.clone();
+            img_url
+                .path_segments_mut()
+                .map_err(|()| {
+                    anyhow::anyhow!(
+                        "Failed to build image URL from base {:?} and path {:?}",
+                        self.http_url.as_str(),
+                        image_rel_url
+                    )
+                })?
+                .push(&image_rel_url);
             let img_data = self.send_request("GET", &img_url)?;
             let mut img_file = File::create(img_filepath)?;
             img_file.write_all(&img_data)?;
