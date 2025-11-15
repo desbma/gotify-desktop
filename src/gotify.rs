@@ -8,7 +8,7 @@ use std::{
     os::unix::io::AsRawFd as _,
     path::{Path, PathBuf},
     rc::Rc,
-    sync::{Arc, LazyLock},
+    sync::LazyLock,
     time::Duration,
 };
 
@@ -110,18 +110,23 @@ impl Client {
         // Init app img cache
         let app_imgs: HashMap<i64, Option<PathBuf>> = HashMap::new();
         let binary_name = env!("CARGO_PKG_NAME");
-        let xdg_dirs = xdg::BaseDirectories::with_prefix(binary_name)?;
+        let xdg_dirs = xdg::BaseDirectories::with_prefix(binary_name);
 
         // HTTP client (non WS)
-        let http_client = ureq::AgentBuilder::new()
-            .tls_connector(Arc::new(ureq::native_tls::TlsConnector::new()?))
-            .user_agent(&USER_AGENT)
-            .build();
+        let http_client = ureq::Agent::config_builder()
+            .tls_config(
+                ureq::tls::TlsConfig::builder()
+                    .provider(ureq::tls::TlsProvider::NativeTls)
+                    .build(),
+            )
+            .user_agent(&*USER_AGENT)
+            .build()
+            .new_agent();
         let mut http_url = cfg.url.clone();
         let scheme = match http_url.scheme() {
             "wss" => "https",
             "ws" => "http",
-            s => anyhow::bail!("Unexpected scheme {:?}", s),
+            s => anyhow::bail!("Unexpected scheme {s:?}"),
         };
         #[expect(clippy::unwrap_used)] // We know the scheme is valid here
         http_url.set_scheme(scheme).unwrap();
@@ -153,32 +158,28 @@ impl Client {
     }
 
     /// Build request with auth header, send it, check status code, and return response
-    fn send_request(&self, method: &'static str, url: &url::Url) -> anyhow::Result<Vec<u8>> {
+    #[expect(clippy::needless_pass_by_value)]
+    fn send_request(&self, method: ureq::http::Method, url: &url::Url) -> anyhow::Result<Vec<u8>> {
         log::debug!("{method} {url}");
-        let request = self.http_client.request_url(method, url);
-        let response = request.set("X-Gotify-Key", &self.token).call()?;
-        anyhow::ensure!(
-            response.status() >= 200 && response.status() < 300,
-            "HTTP response {}: {}",
-            response.status(),
-            response.status_text()
-        );
-        let mut buf = if let Some(content_len) = response
-            .header("Content-Length")
-            .and_then(|h| h.parse::<usize>().ok())
-        {
-            Vec::with_capacity(content_len)
-        } else {
-            Vec::new()
+        let request = match method {
+            ureq::http::Method::GET => self.http_client.get(url.as_str()),
+            ureq::http::Method::DELETE => self.http_client.delete(url.as_str()),
+            _ => unimplemented!(),
         };
-        response.into_reader().read_to_end(&mut buf)?;
+        let response = request.header("X-Gotify-Key", &self.token).call()?;
+        anyhow::ensure!(
+            response.status().is_success(),
+            "HTTP response: {}",
+            response.status(),
+        );
+        let buf = response.into_body().read_to_vec()?;
         Ok(buf)
     }
 
     /// Add auth header to request, send it, check status code, and parse JSON response
     fn send_api_request<T: serde::de::DeserializeOwned>(
         &self,
-        method: &'static str,
+        method: ureq::http::Method,
         url: &url::Url,
     ) -> anyhow::Result<T> {
         let json_data = String::from_utf8(self.send_request(method, url)?)?;
@@ -229,26 +230,27 @@ impl Client {
 
     /// Catch up missed messages since the last received one
     pub(crate) fn get_missed_messages(&mut self) -> anyhow::Result<Vec<Message>> {
-        let mut missed_messages: Vec<Message> =
-            if let Some(last_msg_id) = *self.last_msg_id.borrow() {
-                // Get all recent messages
-                let mut url = self.http_url.clone();
-                url.path_segments_mut()
-                    .map_err(|()| anyhow::anyhow!("Invalid URL {}", self.http_url))?
-                    .push("message");
-                url.query_pairs_mut().append_pair("limit", "200");
-                let all_messages: AllMessages = self.send_api_request("GET", &url)?;
+        let mut missed_messages: Vec<Message> = if let Some(last_msg_id) =
+            *self.last_msg_id.borrow()
+        {
+            // Get all recent messages
+            let mut url = self.http_url.clone();
+            url.path_segments_mut()
+                .map_err(|()| anyhow::anyhow!("Invalid URL {}", self.http_url))?
+                .push("message");
+            url.query_pairs_mut().append_pair("limit", "200");
+            let all_messages: AllMessages = self.send_api_request(ureq::http::Method::GET, &url)?;
 
-                // Keep the ones we have not yet seen
-                all_messages
-                    .messages
-                    .into_iter()
-                    .filter(|m| m.id > last_msg_id)
-                    .rev()
-                    .collect()
-            } else {
-                vec![]
-            };
+            // Keep the ones we have not yet seen
+            all_messages
+                .messages
+                .into_iter()
+                .filter(|m| m.id > last_msg_id)
+                .rev()
+                .collect()
+        } else {
+            vec![]
+        };
 
         for missed_message in &mut missed_messages {
             self.set_message_app_img(missed_message)?;
@@ -301,7 +303,7 @@ impl Client {
                     self.ws.flush()?;
                     continue;
                 }
-                _ => anyhow::bail!("Unexpected message type: {:?}", ws_msg),
+                _ => anyhow::bail!("Unexpected message type: {ws_msg:?}"),
             };
 
             // Parse
@@ -323,7 +325,7 @@ impl Client {
             .map_err(|()| anyhow::anyhow!("Invalid URL {}", self.http_url))?
             .push("message")
             .push(&format!("{msg_id}"));
-        let _ = self.send_request("DELETE", &url)?;
+        let _ = self.send_request(ureq::http::Method::DELETE, &url)?;
         Ok(())
     }
 
@@ -384,7 +386,7 @@ impl Client {
         url.path_segments_mut()
             .map_err(|()| anyhow::anyhow!("Invalid URL {}", self.http_url))?
             .push("application");
-        let apps: Vec<AppInfo> = self.send_api_request("GET", &url)?;
+        let apps: Vec<AppInfo> = self.send_api_request(ureq::http::Method::GET, &url)?;
 
         // Parse it
         let matching_app = apps.into_iter().find(|a| a.id == app_id);
@@ -414,7 +416,7 @@ impl Client {
                     )
                 })?
                 .push(&image_rel_url);
-            let img_data = self.send_request("GET", &img_url)?;
+            let img_data = self.send_request(ureq::http::Method::GET, &img_url)?;
             fs::write(img_filepath, &img_data)?;
             log::debug!("{img_filepath:?} written");
             Ok(true)
