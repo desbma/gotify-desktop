@@ -24,14 +24,14 @@ Small [Gotify](https://gotify.net/) daemon to receive messages and forward them 
 
 You need a Rust build environment for example from [rustup](https://rustup.rs/).
 
-```
+```bash
 cargo build --release
 sudo install -Dm 755 -t /usr/local/bin target/release/gotify-desktop
 ```
 
 If you want to add a [Desktop Entry](https://specifications.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html):
 
-```
+```bash
 sudo install -Dm 644 desktop/gotify-desktop.desktop /usr/share/applications/gotify-desktop.desktop
 curl https://raw.githubusercontent.com/gotify/logo/master/gotify-logo-small.svg -o /tmp/gotify-logo-small.svg
 sudo install -Dm 644 /tmp/gotify-logo-small.svg /usr/share/icons/hicolor/scalable/apps/gotify-desktop.svg
@@ -41,7 +41,7 @@ sudo gtk-update-icon-cache /usr/share/icons/hicolor/
 
 And to install the systemd service:
 
-```
+```bash
 sudo install -Dm 644 -t /usr/lib/systemd/user/ gotify-desktop.service
 ```
 
@@ -53,7 +53,7 @@ Arch Linux users can install the [gotify-desktop AUR package](https://aur.archli
 
 Edit `~/.config/gotify-desktop/config.toml` with your server URL and client token, and other settings:
 
-```
+```toml
 [gotify]
 # gotify server websocket URL, use wss:// prefix for TLS, or ws:// for unencrypted
 url = "wss://SERVER_DOMAIN:SERVER_PORT"
