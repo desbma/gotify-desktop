@@ -3,8 +3,8 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
-    fs::File,
-    io::{ErrorKind, Write as _},
+    fs::{self},
+    io::ErrorKind,
     os::unix::io::AsRawFd as _,
     path::{Path, PathBuf},
     rc::Rc,
@@ -415,8 +415,7 @@ impl Client {
                 })?
                 .push(&image_rel_url);
             let img_data = self.send_request("GET", &img_url)?;
-            let mut img_file = File::create(img_filepath)?;
-            img_file.write_all(&img_data)?;
+            fs::write(img_filepath, &img_data)?;
             log::debug!("{img_filepath:?} written");
             Ok(true)
         } else {
