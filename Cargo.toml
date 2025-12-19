@@ -13,15 +13,15 @@ strip = true
 [dependencies]
 anyhow = { version = "1.0.100", default-features = false, features = ["std", "backtrace"] }
 backon = { version = "1.6.0", default-features = false, features = ["std", "std-blocking-sleep"] }
-log = { version = "0.4.28", default-features = false, features = ["max_level_trace", "release_max_level_info"] }
-mio = { version = "1.1.0", default-features = false, features = ["os-ext"] }
+log = { version = "0.4.29", default-features = false, features = ["max_level_trace", "release_max_level_info"] }
+mio = { version = "1.1.1", default-features = false, features = ["os-ext"] }
 notify-rust = { version = "4.11.7", default-features = false, features = ["serde", "zbus"] }
 serde = { version = "1.0.228", default-features = false, features = ["std"] }
 serde_json = { version = "1.0.145", default-features = false, features = ["std"] }
 shlex = { version = "1.3.0", default-features = false, features = ["std"] }
 simple_logger = { version = "5.1.0", default-features = false, features = ["colors", "timestamps", "stderr"] }
 thiserror = { version = "2.0.17", default-features = false }
-toml = { version = "0.9.8", default-features = false, features = ["parse", "serde"] }
+toml = { version = "0.9.10", default-features = false, features = ["parse", "serde"] }
 tungstenite = { version = "0.28.0", default-features = false, features = ["native-tls", "handshake", "url"] }
 ureq = { version = "3.1.4", default-features = false, features = ["gzip", "native-tls"] }
 url = { version = "2.5.7", default-features = false, features = ["serde"] }
