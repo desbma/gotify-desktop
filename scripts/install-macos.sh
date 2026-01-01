@@ -36,7 +36,8 @@ cargo build --release
 
 # Install binary
 echo "📦 Installing binary to /usr/local/bin..."
-sudo install -Dm 755 target/release/gotify-desktop /usr/local/bin/gotify-desktop
+rm -f /usr/local/bin/gotify-desktop
+install -m 755 target/release/gotify-desktop /usr/local/bin/gotify-desktop
 
 # Create LaunchAgent directory if it doesn't exist
 mkdir -p "$HOME/Library/LaunchAgents"
