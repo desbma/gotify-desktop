@@ -31,13 +31,14 @@ fi
 
 # Build the application
 echo "🔨 Building gotify-desktop..."
-cd "$(dirname "$0")"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
 cargo build --release
 
 # Install binary
 echo "📦 Installing binary to /usr/local/bin..."
 rm -f /usr/local/bin/gotify-desktop
-install -m 755 target/release/gotify-desktop /usr/local/bin/gotify-desktop
+install -m 755 "$SCRIPT_DIR/target/release/gotify-desktop" /usr/local/bin/gotify-desktop
 
 # Create LaunchAgent directory if it doesn't exist
 mkdir -p "$HOME/Library/LaunchAgents"
