@@ -8,6 +8,13 @@ set -e
 
 echo "🐦 Installing gotify-desktop for macOS..."
 
+# Check if running with sudo
+if [ "$EUID" -ne 0 ]; then
+    echo "⚠️  This script requires sudo privileges to install to /usr/local/bin"
+    echo "   Please run with: sudo $0"
+    exit 1
+fi
+
 # Check if Homebrew is installed
 if ! command -v brew &> /dev/null; then
     echo "❌ Homebrew is not installed. Please install it first:"
