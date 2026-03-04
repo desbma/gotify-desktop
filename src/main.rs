@@ -48,10 +48,10 @@ fn handle_message(
         );
     }
 
-    if let Some(on_msg_command) = on_msg_command {
-        if let Err(e) = run_on_msg_command(message, on_msg_command) {
-            log::warn!("Command {on_msg_command:?} failed with error: {e:?}");
-        }
+    if let Some(on_msg_command) = on_msg_command
+        && let Err(e) = run_on_msg_command(message, on_msg_command)
+    {
+        log::warn!("Command {on_msg_command:?} failed with error: {e:?}");
     }
 
     if delete {
