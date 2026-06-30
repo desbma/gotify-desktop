@@ -100,6 +100,21 @@ type WebSocket = tungstenite::WebSocket<tungstenite::stream::MaybeTlsStream<std:
 static USER_AGENT: LazyLock<String> =
     LazyLock::new(|| format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")));
 
+/// Build the ureq agent for Gotify REST calls.
+fn http_agent() -> ureq::Agent {
+    ureq::Agent::config_builder()
+        .tls_config(
+            ureq::tls::TlsConfig::builder()
+                .provider(ureq::tls::TlsProvider::NativeTls)
+                .root_certs(ureq::tls::RootCerts::PlatformVerifier)
+                .build(),
+        )
+        .user_agent(&*USER_AGENT)
+        .proxy(None)
+        .build()
+        .new_agent()
+}
+
 impl Client {
     /// Get a connected Gotify client
     pub(crate) fn connect(
@@ -113,16 +128,7 @@ impl Client {
         let xdg_dirs = xdg::BaseDirectories::with_prefix(binary_name);
 
         // HTTP client (non WS)
-        let http_client = ureq::Agent::config_builder()
-            .tls_config(
-                ureq::tls::TlsConfig::builder()
-                    .provider(ureq::tls::TlsProvider::NativeTls)
-                    .root_certs(ureq::tls::RootCerts::PlatformVerifier)
-                    .build(),
-            )
-            .user_agent(&*USER_AGENT)
-            .build()
-            .new_agent();
+        let http_client = http_agent();
         let mut http_url = cfg.url.clone();
         let scheme = match http_url.scheme() {
             "wss" => "https",
@@ -424,5 +430,32 @@ impl Client {
         } else {
             Ok(false)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{env, process::Command};
+
+    use super::*;
+
+    /// Marker env var for the re-executed child of `http_agent_ignores_env_proxy`.
+    const PROXY_CHILD_MARKER: &str = "GOTIFY_DESKTOP_TEST_PROXY_CHILD";
+
+    #[test]
+    fn http_agent_ignores_env_proxy() {
+        // A proxy env var is set only in a child process, never mutated in this one.
+        if env::var_os(PROXY_CHILD_MARKER).is_some() {
+            assert!(http_agent().config().proxy().is_none());
+            return;
+        }
+
+        let status = Command::new(env::current_exe().unwrap())
+            .args(["--exact", "gotify::tests::http_agent_ignores_env_proxy"])
+            .env(PROXY_CHILD_MARKER, "1")
+            .env("ALL_PROXY", "socks5h://127.0.0.1:9050")
+            .status()
+            .unwrap();
+        assert!(status.success());
     }
 }
