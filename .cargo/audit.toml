@@ -1,0 +1,3 @@
+[advisories]
+# Merged into zbus 6, pending https://github.com/hoodie/notify-rust/pull/294
+ignore = ["RUSTSEC-2026-0370", "RUSTSEC-2026-0371", "RUSTSEC-2026-0372"]
