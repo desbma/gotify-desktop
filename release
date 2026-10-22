@@ -22,5 +22,4 @@ cargo check
 cargo test
 
 jj new
-
-git tag -f -m "Version ${VERSION}" "${VERSION}"
+jj tag set -r @- "${VERSION}"
