@@ -565,6 +565,7 @@ dependencies = [
  "ureq",
  "url",
  "xdg",
+ "zbus",
 ]
 
 [[package]]
