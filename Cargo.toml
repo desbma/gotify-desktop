@@ -27,6 +27,9 @@ ureq = { version = "3.5.0", default-features = false, features = ["gzip", "nativ
 url = { version = "2.5.8", default-features = false, features = ["serde"] }
 xdg = { version = "3.0.0", default-features = false }
 
+[target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
+zbus = { version = "5.19.0", default-features = false, features = ["async-io", "blocking-api"] }
+
 [lints.rust]
 # https://doc.rust-lang.org/rustc/lints/listing/allowed-by-default.html
 explicit_outlives_requirements = "warn"
